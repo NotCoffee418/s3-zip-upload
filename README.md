@@ -1,5 +1,14 @@
 # S3 Zip Upload Action
-GitHub Action to create a zip file from a folder and upload it to S3
+A GitHub Action for easily creating a zip file from a folder and uploading it to S3. This action can also be used to upload a pre-made zip file or any other single file. It supports Linux, Windows, and any other `runs-on` that can run Node.
+
+## Features
+- Creates zip files and uploads them to S3
+- Can upload pre-made zip files or any other single files
+- Supports Linux, Windows, and other `runs-on` that can run Node
+- Easy to configure and use
+
+## Usage
+(coming soon)
 
 
 ## Manual tests

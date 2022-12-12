@@ -1,0 +1,23 @@
+name: 'S3 Zip Upload'
+description: 'Creates a zip file and uploads it to S3, and can also upload individual files. It works on both Linux and Windows'
+author: 'Stijn Raeymaekers'
+branding:
+  icon: 'upload-cloud'
+  color: 'orange'
+runs:
+  using: 'node16'
+  main: 'index.js'
+  dependencies:
+  - 'aws-sdk'
+  - 'archiver'
+  - 'fs'
+  - 'path'
+
+tags:
+  - 's3'
+  - 'zip'
+  - 'upload'
+  - 'windows'
+  - 'linux'
+
+  
