@@ -1,0 +1,40 @@
+{
+  "name": "s3-zip-upload",
+  "version": "1.0.0",
+  "description": "Upload a directory to S3 using GitHub actions.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "debug": "node ./debug/debug.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NotCoffee418/s3-zip-upload.git"
+  },
+  "keywords": [
+    "s3",
+    "upload",
+    "github",
+    "actions"
+  ],
+  "author": "Stijn Raeymaekers",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/NotCoffee418/s3-zip-upload/issues"
+  },
+  "homepage": "https://github.com/NotCoffee418/s3-zip-upload#readme",
+  "devDependencies": {
+    "@actions/exec": "^1.1.1",
+    "eslint": "^8.29.0",
+    "eslint-config-standard": "^17.0.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-n": "^15.6.0",
+    "eslint-plugin-promise": "^6.1.1"
+  },
+  "dependencies": {
+    "@actions/core": "^1.10.0",
+    "archiver": "^5.3.1",
+    "aws-sdk": "^2.1272.0",
+    "dotenv": "^16.0.3"
+  }
+}
