@@ -20,7 +20,7 @@ process.env.ZIP_PATH = './debug/debugdata.zip';
 
 (async () => {
   // Pass all environment variables into the exec() function
-  await exec.exec('node action.js', undefined, {
+  await exec.exec('node index.js', undefined, {
     env: { ...process.env }
   })
 })()

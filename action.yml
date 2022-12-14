@@ -7,8 +7,9 @@ branding:
   color: 'orange'
 runs:
   using: 'node16'
-  main: 'action.js'
+  main: 'release/index.js'
 dependencies:
+  - '@actions/core'
   - 'aws-sdk'
   - 'archiver'
   - 'fs'
