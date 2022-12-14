@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Upload ZIP to S3
-        uses: NotCoffee418/s3-zip-upload
+        uses: NotCoffee418/s3-zip-upload@v1
         env:
           AWS_SECRET_ID: ${{ secrets.AWS_SECRET_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
@@ -58,6 +58,7 @@ npm run debug zip # uploads a dummy folder as debug-override/debug-action.zip
 ```
 
 ## Releasing new version
+
 1. Update the version in `package.json`
 2. `npm run build`
 3. Create a new tag and release on GitHub
