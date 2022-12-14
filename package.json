@@ -2,7 +2,7 @@
   "name": "s3-zip-upload",
   "version": "1.0.0",
   "description": "Upload a directory to S3 using GitHub actions.",
-  "main": "index.js",
+  "main": "action.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "debug": "node ./debug/debug.js"

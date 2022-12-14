@@ -4,7 +4,7 @@ const dotenv = require('dotenv')
 dotenv.config()
 
 // Optinal debug overrides using the debugdata folder
-const param = process.argv[2]
+const param = process.argv[2] ?? 'zip'
 if (param.toLowerCase() === 'zip') {
   console.log('debugging with override mode DIR_AS_ZIP')
   process.env.SOURCE_MODE = 'ZIP'
@@ -16,10 +16,11 @@ if (param.toLowerCase() === 'zip') {
   process.env.SOURCE_PATH = './debug/debugdata/dog1.jpg'
   process.env.DEST_FILE = 'debug-override/debug-dog.jpg'
 }
+process.env.ZIP_PATH = './debug/debugdata.zip';
 
 (async () => {
   // Pass all environment variables into the exec() function
-  await exec.exec('node index.js', undefined, {
+  await exec.exec('node action.js', undefined, {
     env: { ...process.env }
   })
 })()
