@@ -17,7 +17,7 @@ All inputs are environment variables. See the example below for usage.
 
 **AWS_SECRET_ID**: AWS access key ID (required)  
 **AWS_SECRET_KEY**: AWS secret access key (required)  
-**AWS_BUCKET**: AWS bucket name (required)  
+**BUCKET_NAME**: AWS bucket name (required)  
 **AWS_REGION**: AWS region (defaults to eu-central-1)  
 **SOURCE_MODE**: This can be `ZIP` or `FILE`. (defaults to `ZIP`)  
 **SOURCE_PATH**: This should be a file or a directory depending on your source mode. (required)  
@@ -39,7 +39,7 @@ jobs:
         env:
           AWS_SECRET_ID: ${{ secrets.AWS_SECRET_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
-          AWS_BUCKET: ${{ secrets.AWS_BUCKET }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
           AWS_REGION: eu-central-1
           SOURCE_MODE: ZIP
           SOURCE_PATH: ./debug-override
