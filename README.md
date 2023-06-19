@@ -19,9 +19,12 @@ All inputs are environment variables. See the example below for usage.
 **AWS_SECRET_KEY**: AWS secret access key (required)  
 **BUCKET_NAME**: AWS bucket name (required)  
 **AWS_REGION**: AWS region (defaults to eu-central-1)  
-**SOURCE_MODE**: This can be `ZIP` or `FILE`. (defaults to `ZIP`)  
+**SOURCE_MODE**: Source mode (defaults to ZIP)
+    - `ZIP`: Assumes `SOURCE_PATH` is a directory. Creates a zip file from the source path and uploads it to S3 (default)
+    - `FILE`: Assumes `SOURCE_PATH` is a premade zip file. Uploads a single file to S3.
 **SOURCE_PATH**: This should be a file or a directory depending on your source mode. (required)  
 **DEST_FILE**: Output file name or path inside the bucket. (required)  
+**S3_ENDPOINT**: Optional override S3 endpoint for custom S3 implementations. Region is still required.
 
 ## Example usage
 
@@ -35,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Upload ZIP to S3
-        uses: NotCoffee418/s3-zip-upload@v1
+        uses: NotCoffee418/s3-zip-upload@v1.1
         env:
           AWS_SECRET_ID: ${{ secrets.AWS_SECRET_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
