@@ -15,6 +15,7 @@ async function main () {
       AWS_SECRET_ID = null,
       AWS_SECRET_KEY = null,
       AWS_REGION = 'eu-central-1',
+      S3_ENDPOINT = null,
       ZIP_PATH = './tmp.zip', // Temporary zip file. Will not be removed automatically
       SOURCE_MODE = 'ZIP' // ZIP, FILE, DIRECTORY (not implemented yet)
     } = process.env
@@ -78,12 +79,24 @@ async function main () {
       }
     }
 
-    // Init S3 upload
+    // Init S3
     console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`)
+    const s3Config = {
+      apiVersion: '2006-03-01',
+      accessKeyId: AWS_SECRET_ID,
+      secretAccessKey: AWS_SECRET_KEY,
+      region: AWS_REGION
+    }
+    if (S3_ENDPOINT) {
+      s3Config.endpoint = S3_ENDPOINT
+    }
+    const s3 = new AWS.S3(s3Config)
+
+    // Upload file
     const fileToUpload = SOURCE_MODE === modes.ZIP ? ZIP_PATH : SOURCE_PATH
-    const s3 = new AWS.S3({ apiVersion: '2006-03-01', accessKeyId: AWS_SECRET_ID, secretAccessKey: AWS_SECRET_KEY, region: AWS_REGION })
     let fileData
     try {
+      // todo: this can be optimized to stream the file instead of reading it all into memory
       fileData = fs.readFileSync(`${fileToUpload}`)
     } catch (err) {
       console.log(`Failed to read file "${fileToUpload}"`)
