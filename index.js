@@ -17,7 +17,7 @@ async function main () {
       AWS_REGION = 'eu-central-1',
       S3_ENDPOINT = null,
       ZIP_PATH = './tmp.zip', // Temporary zip file. Will not be removed automatically
-      SOURCE_MODE = 'ZIP' // ZIP, FILE, DIRECTORY (not implemented yet)
+      SOURCE_MODE = 'ZIP' // ZIP, FILE
     } = process.env
 
     // Validate inputs
@@ -40,7 +40,6 @@ async function main () {
     const modes = {
       ZIP: 'ZIP',
       FILE: 'FILE'
-      // DIRECTORY   : 'DIRECTORY' -- will implement if needed or on request
     }
     if (!Object.values(modes).includes(SOURCE_MODE)) {
       throw Error(`SOURCE_MODE "${SOURCE_MODE}" is not valid. See documentation remove the environment variable to use the default.`)
@@ -94,23 +93,29 @@ async function main () {
 
     // Upload file
     const fileToUpload = SOURCE_MODE === modes.ZIP ? ZIP_PATH : SOURCE_PATH
-    let fileData
+    let readStream
     try {
-      // todo: this can be optimized to stream the file instead of reading it all into memory
-      fileData = fs.readFileSync(`${fileToUpload}`)
+      readStream = fs.createReadStream(fileToUpload)
     } catch (err) {
       console.log(`Failed to read file "${fileToUpload}"`)
       throw err
     }
 
     const req = {
-      Body: fileData,
+      Body: readStream,
       Bucket: BUCKET_NAME,
       Key: DEST_FILE
     }
 
     console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`)
-    s3.upload(req, (err, data) => {
+
+    // Use the managed upload feature of the SDK to upload the stream
+    const upload = new AWS.S3.ManagedUpload({
+      params: req,
+      service: s3
+    })
+
+    upload.send((err, data) => {
       if (err) {
         console.log(`Failed upload to ${BUCKET_NAME}`)
         throw Error(`S3 Upload error: ${err}`)
