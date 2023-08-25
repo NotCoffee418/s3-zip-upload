@@ -10,7 +10,7 @@ runs:
   main: 'release/index.js'
 dependencies:
   - '@actions/core'
-  - 'aws-sdk'
+  - '@aws-sdk/client-s3'
   - 'archiver'
   - 'fs'
   - 'path'

@@ -1,9 +1,10 @@
 const core = require('@actions/core')
 const path = require('path')
-const os = require('os');
+const os = require('os')
 const fs = require('fs')
 const archiver = require('archiver')
-const AWS = require('aws-sdk')
+const { S3Client } = require('@aws-sdk/client-s3')
+const { Upload } = require('@aws-sdk/lib-storage')
 require('dotenv').config()
 
 async function main () {
@@ -61,15 +62,24 @@ async function main () {
 
     // Compress directory if needed
     if (SOURCE_MODE === modes.ZIP) {
-      console.log(`Creating zip file of directory ${path.resolve(SOURCE_PATH)}`)
+      console.log(`Creating zip file of directory ${path.resolve(SOURCE_PATH)} at ${path.resolve(ZIP_PATH)}`)
       try {
         cleanupFiles.push(ZIP_PATH)
         const archive = archiver('zip', { zlib: { level: 9 } })
         const stream = fs.createWriteStream(ZIP_PATH)
         await new Promise((resolve, reject) => {
           archive
-            .directory(SOURCE_PATH, false)
-            .on('error', err => reject(err))
+            .directory(SOURCE_PATH, false).directory(SOURCE_PATH, false)
+            .on('error', err => {
+              console.error('Error inside archive:', err)
+              reject(err)
+            })
+            .on('warning', warning => {
+              console.warn('Warning:', warning)
+            })
+            .on('entry', entry => {
+              console.log('Archiving:', entry.name)
+            })
             .pipe(stream)
 
           stream.on('close', () => resolve())
@@ -80,57 +90,58 @@ async function main () {
         throw err
       }
     }
-
+    
     // Init S3
-    console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`)
+    console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`);
     const s3Config = {
-      apiVersion: '2006-03-01',
-      accessKeyId: AWS_SECRET_ID,
-      secretAccessKey: AWS_SECRET_KEY,
-      region: AWS_REGION
-    }
+      apiVersion: "2006-03-01",
+      credentials: {
+        accessKeyId: AWS_SECRET_ID,
+        secretAccessKey: AWS_SECRET_KEY,
+      },
+      region: AWS_REGION,
+    };
     if (S3_ENDPOINT) {
-      s3Config.endpoint = S3_ENDPOINT
+      s3Config.endpoint = S3_ENDPOINT;
     }
-    const s3 = new AWS.S3(s3Config)
+    const s3 = new S3Client(s3Config);
 
     // Upload file
-    const fileToUpload = SOURCE_MODE === modes.ZIP ? ZIP_PATH : SOURCE_PATH
+    const fileToUpload = SOURCE_MODE === modes.ZIP ? ZIP_PATH : SOURCE_PATH;
     let readStream
     try {
-      readStream = fs.createReadStream(fileToUpload)
+      readStream = fs.createReadStream(fileToUpload);
     } catch (err) {
-      console.log(`Failed to read file "${fileToUpload}"`)
+      console.log(`Failed to read file "${fileToUpload}"`);
       throw err
     }
 
     const req = {
       Body: readStream,
       Bucket: BUCKET_NAME,
-      Key: DEST_FILE
+      Key: DEST_FILE,
     }
 
-    console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`)
+    console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);
 
     // Use the managed upload feature of the SDK to upload the stream
-    const upload = new AWS.S3.ManagedUpload({
-      params: req,
-      service: s3
+    const upload = new Upload({
+      client: s3,
+      params: req
     })
 
-    upload.send((err, data) => {
-      if (err) {
-        console.log(`Failed upload to ${BUCKET_NAME}`)
-        throw Error(`S3 Upload error: ${err}`)
-      } else {
-        console.log(`Succesful upload to ${BUCKET_NAME}`)
-      }
-    })
+    try {
+      await upload.done();
+      console.log(`Succesful upload to ${BUCKET_NAME}`);
+    } catch (err) {
+      console.log(`Failed upload to ${BUCKET_NAME}`);
+      throw Error(`S3 Upload error: ${err}`);
+    }
   } catch (error) {
     core.setFailed(error.message)
   } finally {
     try {
-      // cleanup temp files
+      //cleanup temp files
       cleanupFiles.forEach(file => {
         if (fs.existsSync(file)) {
           fs.unlinkSync(file)
