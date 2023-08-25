@@ -16,7 +16,7 @@ async function main () {
       AWS_SECRET_KEY = null,
       AWS_REGION = 'eu-central-1',
       S3_ENDPOINT = null,
-      ZIP_PATH = './tmp.zip', // Temporary zip file. Will not be removed automatically
+      ZIP_PATH = '/tmp/tmp.zip', // Temporary zip file. Will not be removed automatically
       SOURCE_MODE = 'ZIP' // ZIP, FILE
     } = process.env
 
