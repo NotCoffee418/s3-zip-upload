@@ -1,12 +1,14 @@
 const core = require('@actions/core')
 const path = require('path')
+const os = require('os');
 const fs = require('fs')
 const archiver = require('archiver')
 const AWS = require('aws-sdk')
 require('dotenv').config()
 
 async function main () {
-// Load data from environment variables
+  // Load data from environment variables
+  let cleanupFiles = []
   try {
     const {
       SOURCE_PATH = null,
@@ -16,7 +18,7 @@ async function main () {
       AWS_SECRET_KEY = null,
       AWS_REGION = 'eu-central-1',
       S3_ENDPOINT = null,
-      ZIP_PATH = './tmp.zip', // Temporary zip file. Will not be removed automatically
+      ZIP_PATH = path.join(os.tmpdir(), 'tmp.zip'),
       SOURCE_MODE = 'ZIP' // ZIP, FILE
     } = process.env
 
@@ -61,6 +63,7 @@ async function main () {
     if (SOURCE_MODE === modes.ZIP) {
       console.log(`Creating zip file of directory ${path.resolve(SOURCE_PATH)}`)
       try {
+        cleanupFiles.push(ZIP_PATH)
         const archive = archiver('zip', { zlib: { level: 9 } })
         const stream = fs.createWriteStream(ZIP_PATH)
         await new Promise((resolve, reject) => {
@@ -125,6 +128,18 @@ async function main () {
     })
   } catch (error) {
     core.setFailed(error.message)
+  } finally {
+    try {
+      // cleanup temp files
+      cleanupFiles.forEach(file => {
+        if (fs.existsSync(file)) {
+          fs.unlinkSync(file)
+        }
+      })
+    } catch (err) {
+      console.error('An error occurred while cleaning up')
+      console.error(err)
+    }
   }
 }
 
