@@ -63530,11 +63530,11 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
 
 // replace stuff like \* with *
 function globUnescape (s) {
-  return s.replace(/\\(.)/g, '$1')
+  return s.replace(/\\(.)/g, '$1');
 }
 
 function regExpEscape (s) {
-  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
 
 
