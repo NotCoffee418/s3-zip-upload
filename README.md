@@ -15,17 +15,24 @@ It supports Linux, Windows, and any other `runs-on` that can run Node.
 
 All inputs are environment variables. See the example below for usage.
 
-**AWS_SECRET_ID**: AWS access key ID (required)  
-**AWS_SECRET_KEY**: AWS secret access key (required)  
-**BUCKET_NAME**: AWS bucket name (required)
-**STORAGE_CLASS**: AWS storage class (defaults to STANDARD)
-**AWS_REGION**: AWS region (defaults to eu-central-1)  
-**SOURCE_MODE**: Source mode (defaults to ZIP)
-    - `ZIP`: Assumes `SOURCE_PATH` is a directory. Creates a zip file from the source path and uploads it to S3 (default)
-    - `FILE`: Assumes `SOURCE_PATH` is a premade zip file. Uploads a single file to S3.
-**SOURCE_PATH**: This should be a file or a directory depending on your source mode. (required)  
-**DEST_FILE**: Output file name or path inside the bucket. (required)  
-**S3_ENDPOINT**: Optional override S3 endpoint for custom S3 implementations. Region is still required.
+## Required Parameters
+
+| Parameter       | Description                  | Example                  |
+| --------------- | ---------------------------- | ------------------------ |
+| `AWS_SECRET_ID` | AWS access key ID            | `AKIAIOSFODNN7EXAMPLE`  |
+| `AWS_SECRET_KEY`| AWS secret access key        | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `BUCKET_NAME`   | AWS bucket name              | `my-bucket`              |
+| `SOURCE_PATH`   | Source file or directory     | `/path/to/source`        |
+| `DEST_FILE`     | Output file name or path     | `destination-file.zip`   |
+
+## Optional Parameters
+
+| Parameter       | Description                  | Default                  | Example             |
+| --------------- | ---------------------------- | ------------------------ | ------------------- |
+| `STORAGE_CLASS` | AWS storage class            | `STANDARD`               | `ONEZONE_IA`        |
+| `AWS_REGION`    | AWS region                   | `eu-central-1`           | `us-west-2`         |
+| `SOURCE_MODE`   | Source mode                  | `ZIP`                    | `FILE`              |
+| `S3_ENDPOINT`   | S3 endpoint override         | None                     | `https://s3.example.com` |
 
 ## Example usage
 
