@@ -63530,11 +63530,11 @@ Minimatch.prototype.matchOne = function (file, pattern, partial) {
 
 // replace stuff like \* with *
 function globUnescape (s) {
-  return s.replace(/\\(.)/g, '$1');
+  return s.replace(/\\(.)/g, '$1')
 }
 
 function regExpEscape (s) {
-  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+  return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
 }
 
 
@@ -71321,6 +71321,7 @@ async function main () {
       AWS_SECRET_KEY = null,
       AWS_REGION = 'eu-central-1',
       S3_ENDPOINT = null,
+      STORAGE_CLASS = 'STANDARD',
       ZIP_PATH = path.join(os.tmpdir(), 'tmp.zip'),
       SOURCE_MODE = 'ZIP' // ZIP, FILE
     } = process.env
@@ -71392,7 +71393,7 @@ async function main () {
         throw err
       }
     }
-    
+
     // Init S3
     console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`);
     const s3Config = {
@@ -71422,6 +71423,7 @@ async function main () {
       Body: readStream,
       Bucket: BUCKET_NAME,
       Key: DEST_FILE,
+      StorageClass: STORAGE_CLASS
     }
 
     console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);

@@ -17,7 +17,8 @@ All inputs are environment variables. See the example below for usage.
 
 **AWS_SECRET_ID**: AWS access key ID (required)  
 **AWS_SECRET_KEY**: AWS secret access key (required)  
-**BUCKET_NAME**: AWS bucket name (required)  
+**BUCKET_NAME**: AWS bucket name (required)
+**STORAGE_CLASS**: AWS storage class (defaults to STANDARD)
 **AWS_REGION**: AWS region (defaults to eu-central-1)  
 **SOURCE_MODE**: Source mode (defaults to ZIP)
     - `ZIP`: Assumes `SOURCE_PATH` is a directory. Creates a zip file from the source path and uploads it to S3 (default)

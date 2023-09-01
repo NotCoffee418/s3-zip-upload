@@ -107,3 +107,6 @@ dist
 .env
 tmp.zip
 debugdata.zip
+
+# Jetbrains IDE
+.idea/

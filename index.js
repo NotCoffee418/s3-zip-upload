@@ -19,6 +19,7 @@ async function main () {
       AWS_SECRET_KEY = null,
       AWS_REGION = 'eu-central-1',
       S3_ENDPOINT = null,
+      STORAGE_CLASS = 'STANDARD',
       ZIP_PATH = path.join(os.tmpdir(), 'tmp.zip'),
       SOURCE_MODE = 'ZIP' // ZIP, FILE
     } = process.env
@@ -90,7 +91,7 @@ async function main () {
         throw err
       }
     }
-    
+
     // Init S3
     console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`);
     const s3Config = {
@@ -120,6 +121,7 @@ async function main () {
       Body: readStream,
       Bucket: BUCKET_NAME,
       Key: DEST_FILE,
+      StorageClass: STORAGE_CLASS
     }
 
     console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);
