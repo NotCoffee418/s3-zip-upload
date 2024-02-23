@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Upload ZIP to S3
-        uses: NotCoffee418/s3-zip-upload@v1.3
+        uses: NotCoffee418/s3-zip-upload@v1.4
         env:
           AWS_SECRET_ID: ${{ secrets.AWS_SECRET_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
