@@ -70,7 +70,7 @@ async function main () {
         const stream = fs.createWriteStream(ZIP_PATH)
         await new Promise((resolve, reject) => {
           archive
-            .directory(SOURCE_PATH, false).directory(SOURCE_PATH, false)
+            .directory(SOURCE_PATH, false)
             .on('error', err => {
               console.error('Error inside archive:', err)
               reject(err)
