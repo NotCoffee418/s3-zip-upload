@@ -24,13 +24,12 @@ async function main () {
       SOURCE_MODE = 'ZIP', // ZIP, FILE
       METADATA_KEY = null,
       METADATA_VALUE = null,
-      CONTENT_TYPE = null
+      CONTENT_TYPE = 'application/x-msdownload'
     } = process.env
 
     // Validate inputs
     if (!SOURCE_PATH || !DEST_FILE || !BUCKET_NAME || !AWS_SECRET_ID ||
-          !AWS_SECRET_KEY || !AWS_REGION || !ZIP_PATH || !METADATA_KEY ||
-          !METADATA_VALUE || !CONTENT_TYPE) {
+          !AWS_SECRET_KEY || !AWS_REGION || !ZIP_PATH || !CONTENT_TYPE) {
       let errorMessage = 'The following variables are missing: '
       if (!SOURCE_PATH) errorMessage += 'SOURCE_PATH '
       if (!DEST_FILE) errorMessage += 'DEST_FILE '
@@ -102,12 +101,12 @@ async function main () {
     // Init S3
     console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`);
     const s3Config = {
-      apiVersion: "2006-03-01",
+      apiVersion: '2006-03-01',
       credentials: {
         accessKeyId: AWS_SECRET_ID,
-        secretAccessKey: AWS_SECRET_KEY,
+        secretAccessKey: AWS_SECRET_KEY
       },
-      region: AWS_REGION,
+      region: AWS_REGION
     };
     if (S3_ENDPOINT) {
       s3Config.endpoint = S3_ENDPOINT;
@@ -128,9 +127,13 @@ async function main () {
       Body: readStream,
       Bucket: BUCKET_NAME,
       Key: DEST_FILE,
-        StorageClass: STORAGE_CLASS,
-        ContentType: CONTENT_TYPE,
-        Metadata: { METADATA_KEY: METADATA_VALUE }
+      StorageClass: STORAGE_CLASS
+    }
+    if (METADATA_KEY && METADATA_VALUE) {
+      req.Metadata = { METADATA_KEY: METADATA_VALUE }
+    }
+    if (CONTENT_TYPE) {
+      req.ContentType = CONTENT_TYPE
     }
 
     console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);
