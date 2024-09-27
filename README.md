@@ -25,9 +25,6 @@ All inputs are environment variables. See the example below for usage.
 | `BUCKET_NAME`   | AWS bucket name              | `my-bucket`              |
 | `SOURCE_PATH`   | Source file or directory     | `/path/to/source`        |
 | `DEST_FILE`     | Output file name or path     | `destination-file.zip`   |
-| `CONTENT_TYPE`  | Content type metadata        | `application/x-msdownload` |
-| `METADATA_KEY`  | user defined meta data key   | `x-amz-meta-version`     |
-| `METADATA_VALUE` | user defined meta data value | `9.99`                   |
 
 ## Optional Parameters
 
@@ -37,6 +34,9 @@ All inputs are environment variables. See the example below for usage.
 | `AWS_REGION`    | AWS region                   | `eu-central-1`           | `us-west-2`         |
 | `SOURCE_MODE`   | Source mode                  | `ZIP`                    | `FILE`              |
 | `S3_ENDPOINT`   | S3 endpoint override         | None                     | `https://s3.example.com` |
+| `CONTENT_TYPE`  | Content type metadata        | `application/x-msdownload` |
+| `METADATA_KEY`  | user defined meta data key   | `x-amz-meta-version`     |
+| `METADATA_VALUE` | user defined meta data value | `9.99`                   |
 
 ## Example usage
 
@@ -50,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Upload ZIP to S3
-        uses: NotCoffee418/s3-zip-upload@v1.4
+        uses: NotCoffee418/s3-zip-upload@v1.5
         env:
           AWS_SECRET_ID: ${{ secrets.AWS_SECRET_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
