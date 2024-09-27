@@ -34,9 +34,9 @@ All inputs are environment variables. See the example below for usage.
 | `AWS_REGION`    | AWS region                   | `eu-central-1`           | `us-west-2`         |
 | `SOURCE_MODE`   | Source mode                  | `ZIP`                    | `FILE`              |
 | `S3_ENDPOINT`   | S3 endpoint override         | None                     | `https://s3.example.com` |
-| `CONTENT_TYPE`  | Content type metadata        | `application/x-msdownload` |
-| `METADATA_KEY`  | user defined meta data key   | `x-amz-meta-version`     |
-| `METADATA_VALUE` | user defined meta data value | `9.99`                   |
+| `CONTENT_TYPE`  | Content type metadata        | `application/zip` (for zip uploads) | `application/x-msdownload` |
+| `METADATA_KEY`  | user defined meta data key   | None                       | `x-amz-meta-version` |
+| `METADATA_VALUE` | user defined meta data value | None                      | `9.99` |
 
 ## Example usage
 

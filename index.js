@@ -11,7 +11,7 @@ async function main () {
   // Load data from environment variables
   let cleanupFiles = []
   try {
-    const {
+    let {
       SOURCE_PATH = null,
       DEST_FILE = null,
       BUCKET_NAME = null,
@@ -24,26 +24,21 @@ async function main () {
       SOURCE_MODE = 'ZIP', // ZIP, FILE
       METADATA_KEY = null,
       METADATA_VALUE = null,
-      CONTENT_TYPE = 'application/x-msdownload'
+      CONTENT_TYPE = null
     } = process.env
 
-    // Validate inputs
-    if (!SOURCE_PATH || !DEST_FILE || !BUCKET_NAME || !AWS_SECRET_ID ||
-          !AWS_SECRET_KEY || !AWS_REGION || !ZIP_PATH || !CONTENT_TYPE) {
-      let errorMessage = 'The following variables are missing: '
-      if (!SOURCE_PATH) errorMessage += 'SOURCE_PATH '
-      if (!DEST_FILE) errorMessage += 'DEST_FILE '
-      if (!BUCKET_NAME) errorMessage += 'BUCKET_NAME '
-      if (!AWS_SECRET_ID) errorMessage += 'AWS_SECRET_ID '
-      if (!AWS_SECRET_KEY) errorMessage += 'AWS_SECRET_KEY '
-      if (!AWS_REGION) errorMessage += 'AWS_REGION '
-      if (!ZIP_PATH) errorMessage += 'ZIP_PATH '
-      if (!SOURCE_MODE) errorMessage += 'SOURCE_MODE '
-      if (!METADATA_KEY) errorMessage += 'METADATA_KEY '
-      if (!METADATA_VALUE) errorMessage += 'METADATA_VALUE '
-      if (!CONTENT_TYPE) errorMessage += 'CONTENT_TYPE '
-
-      throw new Error(errorMessage)
+    // Validate required variables
+    let missingVars = '';
+    if (!SOURCE_PATH) missingVars += 'SOURCE_PATH '
+    if (!DEST_FILE) missingVars += 'DEST_FILE '
+    if (!BUCKET_NAME) missingVars += 'BUCKET_NAME '
+    if (!AWS_SECRET_ID) missingVars += 'AWS_SECRET_ID '
+    if (!AWS_SECRET_KEY) missingVars += 'AWS_SECRET_KEY '
+    if (!AWS_REGION) missingVars += 'AWS_REGION '
+    if (!ZIP_PATH) missingVars += 'ZIP_PATH '
+    if (!SOURCE_MODE) missingVars += 'SOURCE_MODE '
+    if (missingVars.length > 0) {
+      throw new Error(`The following variables are missing: ${missingVars}`)
     }
 
     // Validate source mode
@@ -69,7 +64,7 @@ async function main () {
 
     // Compress directory if needed
     if (SOURCE_MODE === modes.ZIP) {
-      console.log(`Creating zip file of directory ${path.resolve(SOURCE_PATH)} at ${path.resolve(ZIP_PATH)}`)
+      console.info(`Creating zip file of directory ${path.resolve(SOURCE_PATH)} at ${path.resolve(ZIP_PATH)}`)
       try {
         cleanupFiles.push(ZIP_PATH)
         const archive = archiver('zip', { zlib: { level: 9 } })
@@ -85,13 +80,16 @@ async function main () {
               console.warn('Warning:', warning)
             })
             .on('entry', entry => {
-              console.log('Archiving:', entry.name)
+              console.info('Archiving:', entry.name)
             })
             .pipe(stream)
 
           stream.on('close', () => resolve())
           archive.finalize()
         })
+
+        // Override content type
+        CONTENT_TYPE = 'application/zip'
       } catch (err) {
         console.error('An error occurred while creating the zip file')
         throw err
@@ -99,7 +97,7 @@ async function main () {
     }
 
     // Init S3
-    console.log(`Initializing S3 upload to bucket "${BUCKET_NAME}"`);
+    console.info(`Initializing S3 upload to bucket "${BUCKET_NAME}"`);
     const s3Config = {
       apiVersion: '2006-03-01',
       credentials: {
@@ -107,9 +105,9 @@ async function main () {
         secretAccessKey: AWS_SECRET_KEY
       },
       region: AWS_REGION
-    };
+    }
     if (S3_ENDPOINT) {
-      s3Config.endpoint = S3_ENDPOINT;
+      s3Config.endpoint = S3_ENDPOINT
     }
     const s3 = new S3Client(s3Config);
 
@@ -119,7 +117,7 @@ async function main () {
     try {
       readStream = fs.createReadStream(fileToUpload);
     } catch (err) {
-      console.log(`Failed to read file "${fileToUpload}"`);
+      console.error(`Failed to read file "${fileToUpload}"`);
       throw err
     }
 
@@ -136,7 +134,7 @@ async function main () {
       req.ContentType = CONTENT_TYPE
     }
 
-    console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);
+    console.info(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);
 
     // Use the managed upload feature of the SDK to upload the stream
     const upload = new Upload({
@@ -146,9 +144,9 @@ async function main () {
 
     try {
       await upload.done();
-      console.log(`Succesful upload to ${BUCKET_NAME}`);
+      console.info(`Succesful upload to ${BUCKET_NAME}`);
     } catch (err) {
-      console.log(`Failed upload to ${BUCKET_NAME}`);
+      console.info(`Failed upload to ${BUCKET_NAME}`);
       throw Error(`S3 Upload error: ${err}`);
     }
   } catch (error) {
