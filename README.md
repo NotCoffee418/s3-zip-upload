@@ -2,7 +2,8 @@
 
 A GitHub Action for easily creating a zip file from a folder and uploading it to S3.  
 This action can also be used to upload a pre-made zip file or any other single file.  
-It supports Linux, Windows, and any other `runs-on` that can run Node.
+It supports Linux, Windows, and any other `runs-on` that can run Node. with content
+type and user defined meta data
 
 ## Features
 
@@ -19,11 +20,14 @@ All inputs are environment variables. See the example below for usage.
 
 | Parameter       | Description                  | Example                  |
 | --------------- | ---------------------------- | ------------------------ |
-| `AWS_SECRET_ID` | AWS access key ID            | `AKIAIOSFODNN7EXAMPLE`  |
+| `AWS_SECRET_ID` | AWS access key ID            | `AKIAIOSFODNN7EXAMPLE`   |
 | `AWS_SECRET_KEY`| AWS secret access key        | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
 | `BUCKET_NAME`   | AWS bucket name              | `my-bucket`              |
 | `SOURCE_PATH`   | Source file or directory     | `/path/to/source`        |
 | `DEST_FILE`     | Output file name or path     | `destination-file.zip`   |
+| `CONTENT_TYPE`  | Content type metadata        | `application/x-msdownload` |
+| `METADATA_KEY`  | user defined meta data key   | `x-amz-meta-version`     |
+| `METADATA_VALUE` | user defined meta data value | `9.99`                   |
 
 ## Optional Parameters
 
@@ -55,6 +59,9 @@ jobs:
           SOURCE_MODE: ZIP
           SOURCE_PATH: ./debug-override
           DEST_FILE: debug-action.zip
+          CONTENT_TYPE: application/x-msdownload
+          METADATA_KEY: x-amz-meta-version
+          METADATA_VALUE: 9.99
 ```
 
 ## Manual action tests

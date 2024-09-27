@@ -21,12 +21,16 @@ async function main () {
       S3_ENDPOINT = null,
       STORAGE_CLASS = 'STANDARD',
       ZIP_PATH = path.join(os.tmpdir(), 'tmp.zip'),
-      SOURCE_MODE = 'ZIP' // ZIP, FILE
+      SOURCE_MODE = 'ZIP', // ZIP, FILE
+      METADATA_KEY = null,
+      METADATA_VALUE = null,
+      CONTENT_TYPE = null
     } = process.env
 
     // Validate inputs
     if (!SOURCE_PATH || !DEST_FILE || !BUCKET_NAME || !AWS_SECRET_ID ||
-      !AWS_SECRET_KEY || !AWS_REGION || !ZIP_PATH) {
+          !AWS_SECRET_KEY || !AWS_REGION || !ZIP_PATH || !METADATA_KEY ||
+          !METADATA_VALUE || !CONTENT_TYPE) {
       let errorMessage = 'The following variables are missing: '
       if (!SOURCE_PATH) errorMessage += 'SOURCE_PATH '
       if (!DEST_FILE) errorMessage += 'DEST_FILE '
@@ -36,6 +40,9 @@ async function main () {
       if (!AWS_REGION) errorMessage += 'AWS_REGION '
       if (!ZIP_PATH) errorMessage += 'ZIP_PATH '
       if (!SOURCE_MODE) errorMessage += 'SOURCE_MODE '
+      if (!METADATA_KEY) errorMessage += 'METADATA_KEY '
+      if (!METADATA_VALUE) errorMessage += 'METADATA_VALUE '
+      if (!CONTENT_TYPE) errorMessage += 'CONTENT_TYPE '
 
       throw new Error(errorMessage)
     }
@@ -121,7 +128,9 @@ async function main () {
       Body: readStream,
       Bucket: BUCKET_NAME,
       Key: DEST_FILE,
-      StorageClass: STORAGE_CLASS
+        StorageClass: STORAGE_CLASS,
+        ContentType: CONTENT_TYPE,
+        Metadata: { METADATA_KEY: METADATA_VALUE }
     }
 
     console.log(`Uploading zip to "${BUCKET_NAME}" as "${DEST_FILE}"`);
