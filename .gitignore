@@ -110,3 +110,4 @@ debugdata.zip
 
 # Jetbrains IDE
 .idea/
+/.vs
