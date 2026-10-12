@@ -95,8 +95,9 @@ async function main () {
       }
       if (endpoint.username || endpoint.password) {
         // Mask first so the value can't be printed if something echoes it later
+        // (not the username: it's not a secret, and masking a short common word
+        // would blank it out of the whole log and mangle our own messages)
         addSecret(S3_ENDPOINT)
-        addSecret(endpoint.username)
         addSecret(endpoint.password)
         throw Error('S3_ENDPOINT must not contain a username or password')
       }
