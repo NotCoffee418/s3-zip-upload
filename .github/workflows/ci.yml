@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      # --ignore-scripts: no dependency gets to run install hooks
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+      - run: npm audit --audit-level=high
+      # Builds release/ and runs the tests against it
+      - run: npm test
+      # release/ is what actually runs for users, so it must match the source
+      - name: Check release/ is up to date
+        run: git diff --exit-code -- release/

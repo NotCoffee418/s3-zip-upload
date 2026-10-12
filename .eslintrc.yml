@@ -6,4 +6,5 @@ extends: standard
 overrides: []
 parserOptions:
   ecmaVersion: latest
+  sourceType: module
 rules: {}

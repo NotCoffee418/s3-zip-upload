@@ -1,5 +1,5 @@
-const exec = require('@actions/exec')
-const dotenv = require('dotenv')
+import * as exec from '@actions/exec'
+import dotenv from 'dotenv'
 
 dotenv.config()
 
@@ -16,7 +16,7 @@ if (param.toLowerCase() === 'zip') {
   process.env.SOURCE_PATH = './debug/debugdata/dog1.jpg'
   process.env.DEST_FILE = 'debug-override/debug-dog.jpg'
 }
-//process.env.ZIP_PATH = './debug/debugdata.zip';
+// process.env.ZIP_PATH = './debug/debugdata.zip';
 
 (async () => {
   // Pass all environment variables into the exec() function

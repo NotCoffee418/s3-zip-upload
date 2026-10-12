@@ -6,7 +6,7 @@ branding:
   icon: 'upload-cloud'
   color: 'orange'
 runs:
-  using: 'node16'
+  using: 'node24'
   main: 'release/index.js'
 dependencies:
   - '@actions/core'

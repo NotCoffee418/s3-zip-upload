@@ -1,0 +1,5 @@
+# Only enforced once a branch ruleset requires Code Owner review.
+* @NotCoffee418
+/.github/ @NotCoffee418
+/action.yml @NotCoffee418
+/release/ @NotCoffee418
