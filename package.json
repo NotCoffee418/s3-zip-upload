@@ -1,6 +1,6 @@
 {
   "name": "s3-zip-upload",
-  "version": "1.5",
+  "version": "1.7",
   "description": "Upload a directory to S3 using GitHub actions.",
   "main": "index.js",
   "type": "module",
