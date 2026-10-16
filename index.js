@@ -2,7 +2,7 @@ import * as core from '@actions/core'
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs'
-import archiver from 'archiver'
+import { ZipArchive } from 'archiver'
 import { S3Client } from '@aws-sdk/client-s3'
 import { Upload } from '@aws-sdk/lib-storage'
 
@@ -135,7 +135,7 @@ async function main () {
       info(`Creating zip file of directory ${q(absSourceDir)} at ${q(path.resolve(ZIP_PATH))}`)
       try {
         cleanupFiles.push(ZIP_PATH)
-        const archive = archiver('zip', { zlib: { level: 9 } })
+        const archive = new ZipArchive({ zlib: { level: 9 } })
         const stream = fs.createWriteStream(ZIP_PATH)
         await new Promise((resolve, reject) => {
           archive
