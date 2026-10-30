@@ -5721,7 +5721,7 @@ var WriteGetObjectResponse$ = [9, n0, _WGOR,
 class CreateSessionCommand extends command(_ep4, _mw0, "CreateSession", CreateSession$) {
 }
 
-var version = "3.1151.0";
+var version = "3.1155.0";
 var packageInfo = {
 	version: version};
 
@@ -8983,9 +8983,20 @@ exports.validateSigningProperties = validateSigningProperties;
 const { SmithyRpcV2CborProtocol, loadSmithyRpcV2CborErrorCode } = __nccwpck_require__(4645);
 const { TypeRegistry, NormalizedSchema, deref } = __nccwpck_require__(6890);
 const { decorateServiceException, getValueFromTextNode } = __nccwpck_require__(2658);
-const { collectBody, determineTimestampFormat, RpcProtocol, HttpBindingProtocol, HttpInterceptingShapeSerializer, HttpInterceptingShapeDeserializer, FromStringShapeDeserializer, extendedEncodeURIComponent } = __nccwpck_require__(3422);
-const { NumericValue, toUtf8, fromBase64, LazyJsonString, parseEpochTimestamp, parseRfc7231DateTime, parseRfc3339DateTimeWithOffset, generateIdempotencyToken, toBase64, dateToUtcString, expectUnion } = __nccwpck_require__(2430);
+const { RpcProtocol, JsonCodec2, loadJsonRpcErrorCode, HttpBindingProtocol, HttpInterceptingShapeSerializer, HttpInterceptingShapeDeserializer, loadRestJsonErrorCode, FromStringShapeDeserializer, determineTimestampFormat, extendedEncodeURIComponent, collectBody } = __nccwpck_require__(3422);
+const { JsonCodec, JsonShapeDeserializer, JsonShapeDeserializer2, JsonShapeSerializer, JsonShapeSerializer2, parseJsonBody, parseJsonErrorBody } = __nccwpck_require__(3422);
+exports.JsonCodec = JsonCodec;
+exports.JsonCodec2 = JsonCodec2;
+exports.JsonShapeDeserializer = JsonShapeDeserializer;
+exports.JsonShapeDeserializer2 = JsonShapeDeserializer2;
+exports.JsonShapeSerializer = JsonShapeSerializer;
+exports.JsonShapeSerializer2 = JsonShapeSerializer2;
+exports.loadJsonRpcErrorCode = loadJsonRpcErrorCode;
+exports.loadRestJsonErrorCode = loadRestJsonErrorCode;
+exports.parseJsonBody = parseJsonBody;
+exports.parseJsonErrorBody = parseJsonErrorBody;
 const { parseXML, XmlNode, XmlText } = __nccwpck_require__(4274);
+const { toUtf8, toBase64, generateIdempotencyToken, NumericValue, dateToUtcString, fromBase64, expectUnion } = __nccwpck_require__(2430);
 
 class ProtocolLib {
     queryCompat;
@@ -9172,1139 +9183,6 @@ class AwsSmithyRpcV2CborProtocol extends SmithyRpcV2CborProtocol {
             $fault: ns.getMergedTraits().error,
             message,
         }, output), dataObject);
-    }
-}
-
-class SerdeContextConfig {
-    serdeContext;
-    setSerdeContext(serdeContext) {
-        this.serdeContext = serdeContext;
-    }
-}
-
-class UnionSerde {
-    from;
-    to;
-    keys;
-    constructor(from, to) {
-        this.from = from;
-        this.to = to;
-        const keys = Object.keys(this.from);
-        const set = new Set(keys);
-        set.delete("__type");
-        this.keys = set;
-    }
-    mark(key) {
-        this.keys.delete(key);
-    }
-    hasUnknown() {
-        return this.keys.size === 1 && Object.keys(this.to).length === 0;
-    }
-    writeUnknown() {
-        if (this.hasUnknown()) {
-            const k = this.keys.values().next().value;
-            const v = this.from[k];
-            this.to.$unknown = [k, v];
-        }
-    }
-}
-
-let canParseBuffer;
-function detectBufferParsing() {
-    if (canParseBuffer === undefined) {
-        try {
-            if (typeof Buffer !== "function") {
-                canParseBuffer = false;
-            }
-            else {
-                const result = JSON.parse(Buffer.from([0x7b, 0x7d]));
-                canParseBuffer = result !== null && typeof result === "object";
-            }
-        }
-        catch {
-            canParseBuffer = false;
-        }
-    }
-    return canParseBuffer;
-}
-
-function jsonReviver(key, value, context) {
-    if (context?.source) {
-        const numericString = context.source;
-        if (typeof value === "number") {
-            const inSafeRange = value <= Number.MAX_SAFE_INTEGER && value >= Number.MIN_SAFE_INTEGER;
-            if (inSafeRange) {
-                if (isRepresentable(numericString, value)) {
-                    return value;
-                }
-                return new NumericValue(numericString, "bigDecimal");
-            }
-            else {
-                if (isFractionalBigNumeric(numericString)) {
-                    return new NumericValue(numericString, "bigDecimal");
-                }
-                if (/[eE]/.test(numericString)) {
-                    return expandExponentToBigInt(numericString);
-                }
-                return BigInt(numericString);
-            }
-        }
-    }
-    return value;
-}
-function isFractionalBigNumeric(s) {
-    const dotIndex = s.indexOf(".");
-    if (dotIndex === -1) {
-        return false;
-    }
-    const eIndex = s.search(/[eE]/);
-    if (eIndex === -1) {
-        return true;
-    }
-    const fracDigits = eIndex - dotIndex - 1;
-    const exp = parseInt(s.slice(eIndex + 1), 10);
-    return exp < fracDigits;
-}
-function isRepresentable(numericString, value) {
-    if (numericString === String(value)) {
-        return true;
-    }
-    if (Object.is(value, -0)) {
-        return true;
-    }
-    if (/[eE]/.test(numericString)) {
-        return expandToDecimal(numericString) === expandToDecimal(String(value));
-    }
-    const normalized = numericString.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-    const canonical = String(value);
-    if (normalized === canonical) {
-        return true;
-    }
-    if (/[eE]/.test(canonical)) {
-        return normalized === expandToDecimal(canonical);
-    }
-    return false;
-}
-function expandToDecimal(s) {
-    const negative = s.startsWith("-");
-    const abs = negative ? s.slice(1) : s;
-    const eIndex = abs.search(/[eE]/);
-    let result;
-    if (eIndex === -1) {
-        result = abs;
-    }
-    else {
-        const exp = parseInt(abs.slice(eIndex + 1), 10);
-        const mantissa = abs.slice(0, eIndex);
-        const dotIndex = mantissa.indexOf(".");
-        let digits;
-        let intLen;
-        if (dotIndex === -1) {
-            digits = mantissa;
-            intLen = mantissa.length;
-        }
-        else {
-            digits = mantissa.slice(0, dotIndex) + mantissa.slice(dotIndex + 1);
-            intLen = dotIndex;
-        }
-        digits = digits.replace(/0+$/, "") || "0";
-        const newDotPos = intLen + exp;
-        if (digits === "0") {
-            result = "0";
-        }
-        else if (newDotPos <= 0) {
-            result = "0." + "0".repeat(-newDotPos) + digits;
-        }
-        else if (newDotPos >= digits.length) {
-            result = digits + "0".repeat(newDotPos - digits.length);
-        }
-        else {
-            result = digits.slice(0, newDotPos) + "." + digits.slice(newDotPos);
-        }
-    }
-    if (result.includes(".")) {
-        result = result.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
-    }
-    return (negative ? "-" : "") + result;
-}
-function expandExponentToBigInt(s) {
-    const eIndex = s.search(/[eE]/);
-    const exp = parseInt(s.slice(eIndex + 1), 10);
-    const negative = s.startsWith("-");
-    const mantissa = s.slice(negative ? 1 : 0, eIndex);
-    const dotIndex = mantissa.indexOf(".");
-    let digits;
-    let shift;
-    if (dotIndex === -1) {
-        digits = mantissa;
-        shift = exp;
-    }
-    else {
-        digits = mantissa.slice(0, dotIndex) + mantissa.slice(dotIndex + 1);
-        const fracDigits = mantissa.length - dotIndex - 1;
-        shift = exp - fracDigits;
-    }
-    digits = digits.replace(/0+$/, "") || "0";
-    const result = BigInt(digits) * 10n ** BigInt(shift + (mantissa.replace(".", "").length - digits.length));
-    return negative ? -result : result;
-}
-
-const REVIVER_SYMBOL = Symbol.for("@aws-sdk/reviver");
-function needsReviver(schema) {
-    const ns = NormalizedSchema.of(schema);
-    const raw = ns.getSchema();
-    if (Array.isArray(raw) && ns.isStructSchema()) {
-        if (REVIVER_SYMBOL in raw) {
-            return raw[REVIVER_SYMBOL];
-        }
-        const result = _check(ns, new Set());
-        raw[REVIVER_SYMBOL] = result;
-        return result;
-    }
-    return _check(ns, new Set());
-}
-function _check(ns, seen) {
-    const raw = ns.getSchema();
-    if (seen.has(raw)) {
-        return false;
-    }
-    seen.add(raw);
-    if (ns.isBigIntegerSchema() || ns.isBigDecimalSchema()) {
-        return true;
-    }
-    if (ns.isStructSchema()) {
-        for (const [, memberSchema] of ns.structIterator()) {
-            if (_check(memberSchema, seen)) {
-                return true;
-            }
-        }
-    }
-    else if (ns.isListSchema() || ns.isMapSchema()) {
-        if (_check(ns.getValueSchema(), seen)) {
-            return true;
-        }
-    }
-    else if (ns.isDocumentSchema()) {
-        return true;
-    }
-    return false;
-}
-
-const collectBodyString = (streamBody, context) => collectBody(streamBody, context).then((body) => (context?.utf8Encoder ?? toUtf8)(body));
-
-async function parseJsonBody(streamBody, context, schema) {
-    let parsingInput;
-    if (detectBufferParsing() && typeof streamBody?.[Symbol.asyncIterator] === "function") {
-        const buffer = await collectBody(streamBody, context);
-        if (typeof Buffer === "function") {
-            if (Buffer.isBuffer(buffer)) {
-                parsingInput = buffer;
-            }
-            else {
-                parsingInput = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-            }
-        }
-    }
-    if (!parsingInput) {
-        parsingInput = await collectBodyString(streamBody, context);
-    }
-    if (parsingInput.length === 0) {
-        return {};
-    }
-    const reviver = schema && needsReviver(schema) ? jsonReviver : undefined;
-    try {
-        return JSON.parse(parsingInput, reviver);
-    }
-    catch (e) {
-        if (e?.name === "SyntaxError") {
-            Object.defineProperty(e, "$responseBodyText", {
-                value: typeof parsingInput === "string" ? parsingInput : parsingInput.toString("utf8"),
-            });
-        }
-        throw e;
-    }
-}
-const parseJsonErrorBody = async (errorBody, context) => {
-    const value = await parseJsonBody(errorBody, context);
-    value.message = value.message ?? value.Message;
-    return value;
-};
-const findKey = (object, key) => Object.keys(object).find((k) => k.toLowerCase() === key.toLowerCase());
-const sanitizeErrorCode = (rawValue) => {
-    let cleanValue = rawValue;
-    if (typeof cleanValue === "number") {
-        cleanValue = cleanValue.toString();
-    }
-    if (cleanValue.indexOf(",") >= 0) {
-        cleanValue = cleanValue.split(",")[0];
-    }
-    if (cleanValue.indexOf(":") >= 0) {
-        cleanValue = cleanValue.split(":")[0];
-    }
-    if (cleanValue.indexOf("#") >= 0) {
-        cleanValue = cleanValue.split("#")[1];
-    }
-    return cleanValue;
-};
-const loadRestJsonErrorCode = (output, data) => {
-    return loadErrorCode(output, data, ["header", "code", "type"]);
-};
-const loadJsonRpcErrorCode = (output, data, queryCompat = false) => {
-    return loadErrorCode(output, data, queryCompat ? ["code", "header", "type"] : ["type", "code", "header"]);
-};
-const loadErrorCode = ({ headers }, data, order) => {
-    while (order.length > 0) {
-        const location = order.shift();
-        switch (location) {
-            case "header":
-                const headerKey = findKey(headers ?? {}, "x-amzn-errortype");
-                if (headerKey !== undefined) {
-                    return sanitizeErrorCode(headers[headerKey]);
-                }
-                break;
-            case "code":
-                const codeKey = findKey(data ?? {}, "code");
-                if (codeKey && data[codeKey] !== undefined) {
-                    return sanitizeErrorCode(data[codeKey]);
-                }
-                break;
-            case "type":
-                if (data?.__type !== undefined) {
-                    return sanitizeErrorCode(data.__type);
-                }
-                break;
-        }
-    }
-};
-
-function writeKey(obj) {
-    Object.defineProperty(obj, "__proto__", { value: undefined, writable: true, enumerable: true, configurable: true });
-}
-
-class JsonShapeDeserializer2 extends SerdeContextConfig {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    async read(schema, data) {
-        const reviver = needsReviver(schema) ? jsonReviver : undefined;
-        let parsed;
-        if (typeof data === "string") {
-            if (data.length === 0) {
-                return {};
-            }
-            parsed = JSON.parse(data, reviver);
-        }
-        else if (data instanceof Uint8Array && detectBufferParsing()) {
-            if (data.byteLength === 0) {
-                return {};
-            }
-            const buf = Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength);
-            parsed = JSON.parse(buf, reviver);
-        }
-        else {
-            parsed = await parseJsonBody(data, this.serdeContext, schema);
-        }
-        return this._read(schema, parsed);
-    }
-    readObject(schema, data) {
-        return this._read(schema, data);
-    }
-    _read(schema, value) {
-        const isObject = value !== null && typeof value === "object";
-        const ns = NormalizedSchema.of(schema);
-        if (isObject) {
-            if (ns.isStructSchema()) {
-                return this._readStruct(ns, value);
-            }
-            if (Array.isArray(value) && ns.isListSchema()) {
-                const listMember = ns.getValueSchema();
-                if (this.needsTransform(listMember)) {
-                    for (let i = 0; i < value.length; ++i) {
-                        value[i] = this._read(listMember, value[i]);
-                    }
-                }
-                return value;
-            }
-            if (ns.isMapSchema()) {
-                const mapMember = ns.getValueSchema();
-                const map = value;
-                if (this.needsTransform(mapMember)) {
-                    for (const k in map) {
-                        if (k === "__proto__") {
-                            writeKey(map);
-                        }
-                        map[k] = this._read(mapMember, map[k]);
-                    }
-                }
-                return map;
-            }
-        }
-        if (ns.isBlobSchema() && typeof value === "string") {
-            return fromBase64(value);
-        }
-        const mediaType = ns.getMergedTraits().mediaType;
-        if (ns.isStringSchema() && typeof value === "string" && mediaType) {
-            const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-            if (isJson) {
-                return LazyJsonString.from(value);
-            }
-            return value;
-        }
-        if (ns.isTimestampSchema() && value != null) {
-            const format = determineTimestampFormat(ns, this.settings);
-            switch (format) {
-                case 5:
-                    return parseRfc3339DateTimeWithOffset(value);
-                case 6:
-                    return parseRfc7231DateTime(value);
-                case 7:
-                    return parseEpochTimestamp(value);
-                default:
-                    console.warn("Missing timestamp format, parsing value with Date constructor:", value);
-                    return new Date(value);
-            }
-        }
-        if (ns.isBigIntegerSchema() && (typeof value === "number" || typeof value === "string")) {
-            return BigInt(value);
-        }
-        if (ns.isBigDecimalSchema() && value != undefined) {
-            if (value instanceof NumericValue) {
-                return value;
-            }
-            const untyped = value;
-            if (untyped.type === "bigDecimal" && "string" in untyped) {
-                return new NumericValue(untyped.string, untyped.type);
-            }
-            return new NumericValue(String(value), "bigDecimal");
-        }
-        if (ns.isNumericSchema() && typeof value === "string") {
-            switch (value) {
-                case "Infinity":
-                    return Infinity;
-                case "-Infinity":
-                    return -Infinity;
-                case "NaN":
-                    return NaN;
-            }
-            return value;
-        }
-        if (ns.isDocumentSchema()) {
-            if (isObject) {
-                if (Array.isArray(value)) {
-                    for (let i = 0; i < value.length; ++i) {
-                        const v = value[i];
-                        if (!(v instanceof NumericValue)) {
-                            value[i] = this._read(ns, v);
-                        }
-                    }
-                }
-                else {
-                    const doc = value;
-                    for (const k in doc) {
-                        if (k === "__proto__") {
-                            writeKey(doc);
-                        }
-                        const v = doc[k];
-                        if (!(v instanceof NumericValue)) {
-                            doc[k] = this._read(ns, v);
-                        }
-                    }
-                }
-            }
-        }
-        return value;
-    }
-    _readStruct(ns, record) {
-        const union = ns.isUnionSchema();
-        const out = {};
-        let nameMap;
-        const hasType = typeof record.__type === "string";
-        const { jsonName } = this.settings;
-        if (jsonName && hasType) {
-            nameMap = {};
-        }
-        let unionSerde;
-        if (union) {
-            unionSerde = new UnionSerde(record, out);
-        }
-        for (const [memberName, memberSchema] of ns.structIterator()) {
-            let fromKey = memberName;
-            if (jsonName) {
-                fromKey = memberSchema.getMergedTraits().jsonName ?? fromKey;
-                if (hasType) {
-                    nameMap[fromKey] = memberName;
-                }
-            }
-            if (union) {
-                unionSerde.mark(fromKey);
-            }
-            if (record[fromKey] != null) {
-                out[memberName] = this._read(memberSchema, record[fromKey]);
-            }
-        }
-        if (union) {
-            unionSerde.writeUnknown();
-        }
-        else if (hasType) {
-            for (const k in record) {
-                const v = record[k];
-                const t = jsonName ? (nameMap[k] ?? k) : k;
-                if (!(t in out)) {
-                    out[t] = v;
-                }
-            }
-        }
-        return out;
-    }
-    needsTransform(ns) {
-        if (ns.isBlobSchema() || ns.isTimestampSchema() || ns.isBigIntegerSchema() || ns.isBigDecimalSchema()) {
-            return true;
-        }
-        if (ns.isDocumentSchema() || ns.isStructSchema() || ns.isListSchema() || ns.isMapSchema()) {
-            return true;
-        }
-        if (ns.isStringSchema() && ns.getMergedTraits().mediaType) {
-            return true;
-        }
-        return false;
-    }
-}
-
-class JsonBytesStringAdapter extends Uint8Array {
-    string = null;
-    static allocUnsafe(bytes) {
-        if (typeof Buffer === "function") {
-            const buffer = Buffer.allocUnsafe(bytes);
-            return new JsonBytesStringAdapter(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        }
-        return new JsonBytesStringAdapter(bytes);
-    }
-    toString() {
-        return this.s();
-    }
-    valueOf() {
-        return this.s();
-    }
-    includes(searchString, position) {
-        if (typeof searchString === "string") {
-            return this.s().includes(searchString, position);
-        }
-        return Uint8Array.prototype.includes.call(this, searchString, position);
-    }
-    indexOf(searchString, position) {
-        if (typeof searchString === "string") {
-            return this.s().indexOf(searchString, position);
-        }
-        return Uint8Array.prototype.indexOf.call(this, searchString, position);
-    }
-    lastIndexOf(searchString, position) {
-        if (typeof searchString === "string") {
-            return this.s().lastIndexOf(searchString, position);
-        }
-        const fn = Uint8Array.prototype.lastIndexOf;
-        if (position !== undefined) {
-            return fn.call(this, searchString, position);
-        }
-        return fn.call(this, searchString);
-    }
-    startsWith(searchString, position) {
-        return this.s().startsWith(searchString, position);
-    }
-    endsWith(searchString, endPosition) {
-        return this.s().endsWith(searchString, endPosition);
-    }
-    match(regexp) {
-        return this.s().match(regexp);
-    }
-    replace(searchValue, replaceValue) {
-        return this.s().replace(searchValue, replaceValue);
-    }
-    search(regexp) {
-        return this.s().search(regexp);
-    }
-    split(separator, limit) {
-        return this.s().split(separator, limit);
-    }
-    substring(start, end) {
-        return this.s().substring(start, end);
-    }
-    trim() {
-        return this.s().trim();
-    }
-    trimStart() {
-        return this.s().trimStart();
-    }
-    trimEnd() {
-        return this.s().trimEnd();
-    }
-    charAt(pos) {
-        return this.s().charAt(pos);
-    }
-    charCodeAt(index) {
-        return this.s().charCodeAt(index);
-    }
-    padStart(maxLength, fillString) {
-        return this.s().padStart(maxLength, fillString);
-    }
-    padEnd(maxLength, fillString) {
-        return this.s().padEnd(maxLength, fillString);
-    }
-    repeat(count) {
-        return this.s().repeat(count);
-    }
-    toUpperCase() {
-        return this.s().toUpperCase();
-    }
-    toLowerCase() {
-        return this.s().toLowerCase();
-    }
-    s() {
-        if (this.string == null) {
-            const n = Date.now();
-            if (n > warned + 60_000) {
-                console.warn("@aws-sdk/core/protocols - WARN - JsonCodec2: you have called a string method on a Uint8Array request body. " +
-                    "It has been automatically converted to string. In a future version this will throw an error.");
-                warned = n;
-            }
-            this.string = toUtf8(this);
-        }
-        return this.string;
-    }
-}
-var warned = 0;
-
-const encoder = new TextEncoder();
-const OPEN_BRACE = 0x7b;
-const CLOSE_BRACE = 0x7d;
-const OPEN_BRACKET = 0x5b;
-const CLOSE_BRACKET = 0x5d;
-const QUOTE = 0x22;
-const COLON = 0x3a;
-const COMMA = 0x2c;
-const BACKSLASH = 0x5c;
-const TRUE = new Uint8Array([0x74, 0x72, 0x75, 0x65]);
-const FALSE = new Uint8Array([0x66, 0x61, 0x6c, 0x73, 0x65]);
-const NULL = new Uint8Array([0x6e, 0x75, 0x6c, 0x6c]);
-const ESCAPE_TABLE = new Array(128).fill(null);
-ESCAPE_TABLE[0x08] = "b";
-ESCAPE_TABLE[0x09] = "t";
-ESCAPE_TABLE[0x0a] = "n";
-ESCAPE_TABLE[0x0c] = "f";
-ESCAPE_TABLE[0x0d] = "r";
-ESCAPE_TABLE[0x22] = '"';
-ESCAPE_TABLE[0x5c] = "\\";
-for (let i = 0; i < 0x20; i++) {
-    if (ESCAPE_TABLE[i] === null) {
-        ESCAPE_TABLE[i] = "u00" + i.toString(16).padStart(2, "0");
-    }
-}
-const INITIAL_BUFFER_SIZE = 2048;
-function alloc(size) {
-    return JsonBytesStringAdapter.allocUnsafe(size);
-}
-class JsonShapeSerializer2 extends SerdeContextConfig {
-    settings;
-    json;
-    i = 0;
-    rootSchema;
-    rawValue;
-    passthrough = false;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-        this.json = alloc(INITIAL_BUFFER_SIZE);
-    }
-    write(schema, value) {
-        this.i = 0;
-        this.rawValue = value;
-        this.rootSchema = NormalizedSchema.of(schema);
-        this.passthrough = this.rootSchema.isBlobSchema() || this.rootSchema.isStringSchema();
-        if (!this.passthrough) {
-            this.writeValue(this.rootSchema, value, undefined);
-        }
-    }
-    writeDiscriminatedDocument(schema, value) {
-        this.i = 0;
-        this.rootSchema = NormalizedSchema.of(schema);
-        const ns = this.rootSchema;
-        if (ns.isStructSchema() && value != null && typeof value === "object") {
-            this.writeValue(ns, value, undefined);
-            const prefix = `"__type":"${ns.getName(true) ?? "Unknown"}",`;
-            const z = prefix.length;
-            this.ensure(z);
-            this.json.copyWithin(1 + z, 1, this.i);
-            encoder.encodeInto(prefix, this.json.subarray(1));
-            this.i += z;
-        }
-        else {
-            this.writeValue(ns, value, undefined);
-        }
-    }
-    flush() {
-        this.rootSchema = undefined;
-        const finalPosition = this.i;
-        this.i = 0;
-        const raw = this.rawValue;
-        this.rawValue = undefined;
-        if (finalPosition === 0) {
-            return raw;
-        }
-        const result = this.json.subarray(0, finalPosition);
-        this.json = alloc(INITIAL_BUFFER_SIZE);
-        return result;
-    }
-    ensure(byteCount) {
-        const { i, json } = this;
-        if (i + byteCount > json.length) {
-            let newSize = json.length * 2;
-            while (newSize < i + byteCount) {
-                newSize *= 2;
-            }
-            const next = alloc(newSize);
-            next.set(this.json);
-            this.json = next;
-        }
-    }
-    writeAscii(s) {
-        const z = s.length;
-        this.ensure(z);
-        let { i, json } = this;
-        for (let j = 0; j < z; ++j) {
-            json[i] = s.charCodeAt(j);
-            i += 1;
-        }
-        this.i = i;
-    }
-    writeAsciiQuoted(s) {
-        const z = s.length;
-        this.ensure(z + 4);
-        let { json, i } = this;
-        json[i++] = QUOTE;
-        for (let j = 0; j < z; ++j) {
-            json[i++] = s.charCodeAt(j);
-        }
-        json[i++] = QUOTE;
-        this.i = i;
-    }
-    writeJsonString(s) {
-        this.ensure(s.length * 3 + 2);
-        this.json[this.i++] = QUOTE;
-        const z = s.length;
-        for (let j = 0; j < z; ++j) {
-            const c = s.charCodeAt(j);
-            if (c > 0x22 && c < 0x5c) {
-                this.json[this.i++] = c;
-            }
-            else if (c < 0x80) {
-                const esc = ESCAPE_TABLE[c];
-                if (esc !== null) {
-                    this.ensure(esc.length + 1);
-                    this.json[this.i++] = BACKSLASH;
-                    for (let k = 0; k < esc.length; k++) {
-                        this.json[this.i++] = esc.charCodeAt(k);
-                    }
-                }
-                else {
-                    this.json[this.i++] = c;
-                }
-            }
-            else if (c >= 0xd800 && c <= 0xdbff) {
-                const next = j + 1 < z ? s.charCodeAt(j + 1) : 0;
-                if (next >= 0xdc00 && next <= 0xdfff) {
-                    this.ensure(4);
-                    const { written } = encoder.encodeInto(s.substring(j, j + 2), this.json.subarray(this.i));
-                    this.i += written;
-                    ++j;
-                }
-                else {
-                    this.ensure(6);
-                    this.writeUnicodeEscape(c);
-                }
-            }
-            else if (c >= 0xdc00 && c <= 0xdfff) {
-                this.ensure(6);
-                this.writeUnicodeEscape(c);
-            }
-            else {
-                let { i, json } = this;
-                if (c < 0x800) {
-                    json[i++] = 0xc0 | (c >> 6);
-                    json[i++] = 0x80 | (c & 0x3f);
-                }
-                else {
-                    json[i++] = 0xe0 | (c >> 12);
-                    json[i++] = 0x80 | ((c >> 6) & 0x3f);
-                    json[i++] = 0x80 | (c & 0x3f);
-                }
-                this.i = i;
-            }
-        }
-        this.json[this.i++] = QUOTE;
-    }
-    writeUnicodeEscape(code) {
-        let { json, i } = this;
-        json[i++] = BACKSLASH;
-        json[i++] = 0x75;
-        const hex = code.toString(16).padStart(4, "0");
-        for (let j = 0; j < 4; ++j) {
-            json[i++] = hex.charCodeAt(j);
-        }
-        this.i = i;
-    }
-    static B64 = (() => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        const table = new Uint8Array(64);
-        for (let i = 0; i < 64; ++i) {
-            table[i] = chars.charCodeAt(i);
-        }
-        return table;
-    })();
-    writeBase64(data) {
-        const b64Len = Math.ceil(data.length / 3) * 4;
-        this.ensure(b64Len + 2);
-        const json = this.json;
-        const B64 = JsonShapeSerializer2.B64;
-        let i = this.i;
-        json[i++] = QUOTE;
-        const len = data.length;
-        const remainder = len % 3;
-        const mainLen = len - remainder;
-        for (let j = 0; j < mainLen; j += 3) {
-            const a = data[j];
-            const b = data[j + 1];
-            const c = data[j + 2];
-            json[i++] = B64[a >> 2];
-            json[i++] = B64[((a & 0x03) << 4) | (b >> 4)];
-            json[i++] = B64[((b & 0x0f) << 2) | (c >> 6)];
-            json[i++] = B64[c & 0x3f];
-        }
-        if (remainder === 2) {
-            const a = data[mainLen];
-            const b = data[mainLen + 1];
-            json[i++] = B64[a >> 2];
-            json[i++] = B64[((a & 0x03) << 4) | (b >> 4)];
-            json[i++] = B64[(b & 0x0f) << 2];
-            json[i++] = 0x3d;
-        }
-        else if (remainder === 1) {
-            const a = data[mainLen];
-            json[i++] = B64[a >> 2];
-            json[i++] = B64[(a & 0x03) << 4];
-            json[i++] = 0x3d;
-            json[i++] = 0x3d;
-        }
-        json[i++] = QUOTE;
-        this.i = i;
-    }
-    writeValue(schema, value, container) {
-        if (value == null) {
-            if (container?.isStructSchema()) {
-                if (value === undefined) {
-                    const ns = NormalizedSchema.of(schema);
-                    if (ns.isIdempotencyToken()) {
-                        this.writeAsciiQuoted(generateIdempotencyToken());
-                        return;
-                    }
-                }
-                return;
-            }
-            this.ensure(4);
-            this.json.set(NULL, this.i);
-            this.i += 4;
-            return;
-        }
-        const ns = NormalizedSchema.of(schema);
-        const isObject = typeof value === "object";
-        if (ns.isStringSchema()) {
-            const mediaType = ns.getMergedTraits().mediaType;
-            if (mediaType) {
-                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-                if (isJson) {
-                    this.writeJsonString(LazyJsonString.from(value).toString());
-                    return;
-                }
-            }
-        }
-        if (isObject) {
-            if (ns.isStructSchema()) {
-                this.writeStruct(ns, value);
-                return;
-            }
-            if (Array.isArray(value) && (ns.isListSchema() || ns.isDocumentSchema())) {
-                this.writeList(ns, value, ns.isDocumentSchema());
-                return;
-            }
-            if (ns.isMapSchema()) {
-                this.writeMap(ns, value, false);
-                return;
-            }
-            if (value instanceof Uint8Array && (ns.isBlobSchema() || ns.isDocumentSchema())) {
-                this.writeBase64(value);
-                return;
-            }
-            if (value instanceof Date && (ns.isTimestampSchema() || ns.isDocumentSchema())) {
-                this.writeTimestamp(ns, value);
-                return;
-            }
-            if (value instanceof NumericValue) {
-                this.writeAscii(value.string);
-                return;
-            }
-            if (ns.isDocumentSchema()) {
-                if (Array.isArray(value)) {
-                    this.writeList(ns, value, true);
-                }
-                else {
-                    this.writeMap(ns, value, true);
-                }
-                return;
-            }
-            const json = JSON.stringify(value);
-            this.writeAscii(json);
-            return;
-        }
-        if (typeof value === "string") {
-            if (ns.isBlobSchema()) {
-                const b64 = (this.serdeContext?.base64Encoder ?? toBase64)(value);
-                this.writeAsciiQuoted(b64);
-                return;
-            }
-            this.writeJsonString(value);
-            return;
-        }
-        if (typeof value === "number") {
-            if (Math.abs(value) === Infinity || Number.isNaN(value)) {
-                this.writeAsciiQuoted(String(value));
-                return;
-            }
-            const numStr = String(value);
-            this.writeAscii(numStr);
-            return;
-        }
-        if (typeof value === "boolean") {
-            this.ensure(5);
-            let { i, json } = this;
-            if (value) {
-                json.set(TRUE, i);
-                i += 4;
-            }
-            else {
-                json.set(FALSE, i);
-                i += 5;
-            }
-            this.i = i;
-            return;
-        }
-        if (typeof value === "bigint") {
-            this.writeAscii(value.toString());
-            return;
-        }
-        this.writeAscii(String(value));
-    }
-    writeStruct(ns, value) {
-        this.ensure(2);
-        this.json[this.i++] = OPEN_BRACE;
-        let wroteAny = false;
-        const hasType = typeof value.__type === "string";
-        let writtenKeys;
-        if (hasType) {
-            writtenKeys = new Set();
-        }
-        for (const [memberName, memberSchema] of ns.structIterator()) {
-            const item = value[memberName];
-            if (item == null && !memberSchema.isIdempotencyToken()) {
-                continue;
-            }
-            if (wroteAny) {
-                this.ensure(1);
-                this.json[this.i++] = COMMA;
-            }
-            wroteAny = true;
-            const targetKey = this.settings.jsonName ? (memberSchema.getMergedTraits().jsonName ?? memberName) : memberName;
-            if (writtenKeys) {
-                writtenKeys.add(memberName);
-                writtenKeys.add(targetKey);
-            }
-            this.writeAsciiQuoted(targetKey);
-            this.json[this.i++] = COLON;
-            this.writeValue(memberSchema, item, ns);
-        }
-        if (!wroteAny && ns.isUnionSchema()) {
-            const { $unknown } = value;
-            if (Array.isArray($unknown)) {
-                const [k, v] = $unknown;
-                this.writeAsciiQuoted(k);
-                this.ensure(1);
-                this.json[this.i++] = COLON;
-                this.writeValue(15, v, ns);
-            }
-        }
-        else if (hasType) {
-            for (const k in value) {
-                if (writtenKeys.has(k)) {
-                    continue;
-                }
-                writtenKeys.add(k);
-                const v = value[k];
-                if (wroteAny) {
-                    this.ensure(1);
-                    this.json[this.i++] = COMMA;
-                }
-                wroteAny = true;
-                this.writeAsciiQuoted(k);
-                this.ensure(1);
-                this.json[this.i++] = COLON;
-                this.writeValue(15, v, undefined);
-            }
-        }
-        this.ensure(1);
-        this.json[this.i++] = CLOSE_BRACE;
-    }
-    writeList(ns, value, isDocument) {
-        const sparse = !!ns.getMergedTraits().sparse;
-        const valueSchema = ns.getValueSchema();
-        if (!isDocument) {
-            if (valueSchema.isStringSchema() || valueSchema.isNumericSchema() || valueSchema.isBooleanSchema()) {
-                let hasSpecials = false;
-                for (let i = 0; i < value.length; ++i) {
-                    const v = value[i];
-                    if (Number.isNaN(v) || v === Infinity || v === -Infinity || (v == null && !sparse)) {
-                        hasSpecials = true;
-                        break;
-                    }
-                }
-                let json;
-                if (!hasSpecials) {
-                    json = JSON.stringify(value);
-                }
-                else {
-                    const out = [];
-                    for (let i = 0; i < value.length; ++i) {
-                        const v = value[i];
-                        if (v == null && !sparse)
-                            continue;
-                        if (Number.isNaN(v) || v === Infinity || v === -Infinity) {
-                            out.push(String(v));
-                        }
-                        else {
-                            out.push(v);
-                        }
-                    }
-                    json = JSON.stringify(out);
-                }
-                this.ensure(json.length * 3);
-                this.i += encoder.encodeInto(json, this.json.subarray(this.i)).written;
-                return;
-            }
-        }
-        this.ensure(2);
-        this.json[this.i++] = OPEN_BRACKET;
-        let wroteFirstItem = false;
-        for (let i = 0; i < value.length; ++i) {
-            const item = value[i];
-            if (isDocument ? item === undefined : item == null && !sparse) {
-                continue;
-            }
-            if (wroteFirstItem) {
-                this.ensure(1);
-                this.json[this.i++] = COMMA;
-            }
-            this.writeValue(valueSchema, item, undefined);
-            wroteFirstItem = true;
-        }
-        this.ensure(1);
-        this.json[this.i++] = CLOSE_BRACKET;
-    }
-    writeMap(ns, value, isDocument) {
-        const sparse = !!ns.getMergedTraits().sparse;
-        const valueSchema = ns.getValueSchema();
-        if (!isDocument) {
-            if (valueSchema.isStringSchema() || valueSchema.isNumericSchema() || valueSchema.isBooleanSchema()) {
-                let modifications;
-                for (const k in value) {
-                    const v = value[k];
-                    if (Number.isNaN(v) || v === Infinity || v === -Infinity) {
-                        (modifications ??= {})[k] = v;
-                        value[k] = String(v);
-                    }
-                    else if (v === null && !sparse) {
-                        (modifications ??= {})[k] = null;
-                        value[k] = undefined;
-                    }
-                }
-                const json = JSON.stringify(value);
-                if (modifications) {
-                    Object.assign(value, modifications);
-                }
-                this.ensure(json.length * 3);
-                this.i += encoder.encodeInto(json, this.json.subarray(this.i)).written;
-                return;
-            }
-        }
-        this.ensure(2);
-        this.json[this.i++] = OPEN_BRACE;
-        let first = true;
-        for (const k in value) {
-            const v = value[k];
-            if (isDocument ? v === undefined : v == null && !sparse) {
-                continue;
-            }
-            if (!first) {
-                this.ensure(1);
-                this.json[this.i++] = COMMA;
-            }
-            first = false;
-            this.writeJsonString(k);
-            this.ensure(1);
-            this.json[this.i++] = COLON;
-            this.writeValue(valueSchema, v, undefined);
-        }
-        this.ensure(1);
-        this.json[this.i++] = CLOSE_BRACE;
-    }
-    writeTimestamp(ns, value) {
-        const format = determineTimestampFormat(ns, this.settings);
-        switch (format) {
-            case 5: {
-                const iso = value.toISOString().replace(".000Z", "Z");
-                this.writeAsciiQuoted(iso);
-                return;
-            }
-            case 6: {
-                this.writeAsciiQuoted(dateToUtcString(value));
-                return;
-            }
-            case 7: {
-                const epochSecs = String(value.getTime() / 1000);
-                this.writeAscii(epochSecs);
-                return;
-            }
-            default: {
-                const epochSecs = String(value.getTime() / 1000);
-                this.writeAscii(epochSecs);
-                return;
-            }
-        }
-    }
-}
-
-class JsonCodec2 extends SerdeContextConfig {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    createSerializer() {
-        const serializer = new JsonShapeSerializer2(this.settings);
-        serializer.setSerdeContext(this.serdeContext);
-        return serializer;
-    }
-    createDeserializer() {
-        const deserializer = new JsonShapeDeserializer2(this.settings);
-        deserializer.setSerdeContext(this.serdeContext);
-        return deserializer;
     }
 }
 
@@ -10505,407 +9383,42 @@ class AwsRestJsonProtocol extends HttpBindingProtocol {
     }
 }
 
-class JsonShapeDeserializer extends SerdeContextConfig {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    async read(schema, data) {
-        const reviver = needsReviver(schema) ? jsonReviver : undefined;
-        return this._read(schema, typeof data === "string" ? JSON.parse(data, reviver) : await parseJsonBody(data, this.serdeContext, schema));
-    }
-    readObject(schema, data) {
-        return this._read(schema, data);
-    }
-    _read(schema, value) {
-        const isObject = value !== null && typeof value === "object";
-        const ns = NormalizedSchema.of(schema);
-        if (isObject) {
-            if (ns.isStructSchema()) {
-                const record = value;
-                const union = ns.isUnionSchema();
-                const out = {};
-                let nameMap = void 0;
-                const { jsonName } = this.settings;
-                if (jsonName) {
-                    nameMap = {};
-                }
-                let unionSerde;
-                if (union) {
-                    unionSerde = new UnionSerde(record, out);
-                }
-                for (const [memberName, memberSchema] of ns.structIterator()) {
-                    let fromKey = memberName;
-                    if (jsonName) {
-                        fromKey = memberSchema.getMergedTraits().jsonName ?? fromKey;
-                        nameMap[fromKey] = memberName;
-                    }
-                    if (union) {
-                        unionSerde.mark(fromKey);
-                    }
-                    if (record[fromKey] != null) {
-                        out[memberName] = this._read(memberSchema, record[fromKey]);
-                    }
-                }
-                if (union) {
-                    unionSerde.writeUnknown();
-                }
-                else if (typeof record.__type === "string") {
-                    for (const k in record) {
-                        const v = record[k];
-                        const t = jsonName ? (nameMap[k] ?? k) : k;
-                        if (!(t in out)) {
-                            out[t] = v;
-                        }
-                    }
-                }
-                return out;
-            }
-            if (Array.isArray(value) && ns.isListSchema()) {
-                const listMember = ns.getValueSchema();
-                const out = [];
-                for (const item of value) {
-                    out.push(this._read(listMember, item));
-                }
-                return out;
-            }
-            if (ns.isMapSchema()) {
-                const mapMember = ns.getValueSchema();
-                const out = {};
-                for (const _k in value) {
-                    if (_k === "__proto__") {
-                        writeKey(out);
-                    }
-                    out[_k] = this._read(mapMember, value[_k]);
-                }
-                return out;
-            }
-        }
-        if (ns.isBlobSchema() && typeof value === "string") {
-            return fromBase64(value);
-        }
-        const mediaType = ns.getMergedTraits().mediaType;
-        if (ns.isStringSchema() && typeof value === "string" && mediaType) {
-            const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-            if (isJson) {
-                return LazyJsonString.from(value);
-            }
-            return value;
-        }
-        if (ns.isTimestampSchema() && value != null) {
-            const format = determineTimestampFormat(ns, this.settings);
-            switch (format) {
-                case 5:
-                    return parseRfc3339DateTimeWithOffset(value);
-                case 6:
-                    return parseRfc7231DateTime(value);
-                case 7:
-                    return parseEpochTimestamp(value);
-                default:
-                    console.warn("Missing timestamp format, parsing value with Date constructor:", value);
-                    return new Date(value);
-            }
-        }
-        if (ns.isBigIntegerSchema() && (typeof value === "number" || typeof value === "string")) {
-            return BigInt(value);
-        }
-        if (ns.isBigDecimalSchema() && value != undefined) {
-            if (value instanceof NumericValue) {
-                return value;
-            }
-            const untyped = value;
-            if (untyped.type === "bigDecimal" && "string" in untyped) {
-                return new NumericValue(untyped.string, untyped.type);
-            }
-            return new NumericValue(String(value), "bigDecimal");
-        }
-        if (ns.isNumericSchema() && typeof value === "string") {
-            switch (value) {
-                case "Infinity":
-                    return Infinity;
-                case "-Infinity":
-                    return -Infinity;
-                case "NaN":
-                    return NaN;
-            }
-            return value;
-        }
-        if (ns.isDocumentSchema()) {
-            if (isObject) {
-                const out = Array.isArray(value) ? [] : {};
-                for (const k in value) {
-                    if (k === "__proto__") {
-                        writeKey(out);
-                    }
-                    const v = value[k];
-                    if (v instanceof NumericValue) {
-                        out[k] = v;
-                    }
-                    else {
-                        out[k] = this._read(ns, v);
-                    }
-                }
-                return out;
-            }
-            else {
-                return structuredClone(value);
-            }
-        }
-        return value;
+class SerdeContextConfig {
+    serdeContext;
+    setSerdeContext(serdeContext) {
+        this.serdeContext = serdeContext;
     }
 }
 
-const NUMERIC_CONTROL_CHAR = String.fromCharCode(925);
-class JsonReplacer {
-    values = new Map();
-    counter = 0;
-    stage = 0;
-    createReplacer() {
-        if (this.stage === 1) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer already created.");
-        }
-        if (this.stage === 2) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
-        }
-        this.stage = 1;
-        return (key, value) => {
-            if (value instanceof NumericValue) {
-                const v = `${NUMERIC_CONTROL_CHAR + "nv" + this.counter++}_` + value.string;
-                this.values.set(`"${v}"`, value.string);
-                return v;
-            }
-            if (typeof value === "bigint") {
-                const s = value.toString();
-                const v = `${NUMERIC_CONTROL_CHAR + "b" + this.counter++}_` + s;
-                this.values.set(`"${v}"`, s);
-                return v;
-            }
-            return value;
-        };
+class UnionSerde {
+    from;
+    to;
+    keys;
+    constructor(from, to) {
+        this.from = from;
+        this.to = to;
+        const keys = Object.keys(this.from);
+        const set = new Set(keys);
+        set.delete("__type");
+        this.keys = set;
     }
-    replaceInJson(json) {
-        if (this.stage === 0) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer not created yet.");
+    mark(key) {
+        this.keys.delete(key);
+    }
+    hasUnknown() {
+        return this.keys.size === 1 && Object.keys(this.to).length === 0;
+    }
+    writeUnknown() {
+        if (this.hasUnknown()) {
+            const k = this.keys.values().next().value;
+            const v = this.from[k];
+            this.to.$unknown = [k, v];
         }
-        if (this.stage === 2) {
-            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
-        }
-        this.stage = 2;
-        if (this.counter === 0) {
-            return json;
-        }
-        for (const [key, value] of this.values) {
-            json = json.replace(key, value);
-        }
-        return json;
     }
 }
 
-class JsonShapeSerializer extends SerdeContextConfig {
-    settings;
-    buffer;
-    useReplacer = false;
-    rootSchema;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    write(schema, value) {
-        this.rootSchema = NormalizedSchema.of(schema);
-        this.buffer = this._write(this.rootSchema, value);
-    }
-    flush() {
-        const { rootSchema, useReplacer } = this;
-        this.rootSchema = undefined;
-        this.useReplacer = false;
-        if (rootSchema?.isStructSchema() || rootSchema?.isDocumentSchema()) {
-            if (!useReplacer) {
-                return JSON.stringify(this.buffer);
-            }
-            const replacer = new JsonReplacer();
-            return replacer.replaceInJson(JSON.stringify(this.buffer, replacer.createReplacer(), 0));
-        }
-        return this.buffer;
-    }
-    writeDiscriminatedDocument(schema, value) {
-        this.write(schema, value);
-        if (typeof this.buffer === "object") {
-            this.buffer.__type = NormalizedSchema.of(schema).getName(true);
-        }
-    }
-    _write(schema, value, container) {
-        const isObject = value !== null && typeof value === "object";
-        const ns = NormalizedSchema.of(schema);
-        if (isObject) {
-            if (ns.isStructSchema()) {
-                const record = value;
-                const out = {};
-                const { jsonName } = this.settings;
-                let nameMap = void 0;
-                if (jsonName) {
-                    nameMap = {};
-                }
-                let outCount = 0;
-                for (const [memberName, memberSchema] of ns.structIterator()) {
-                    const serializableValue = this._write(memberSchema, record[memberName], ns);
-                    if (serializableValue !== undefined) {
-                        let targetKey = memberName;
-                        if (jsonName) {
-                            targetKey = memberSchema.getMergedTraits().jsonName ?? memberName;
-                            nameMap[memberName] = targetKey;
-                        }
-                        out[targetKey] = serializableValue;
-                        outCount++;
-                    }
-                }
-                if (ns.isUnionSchema() && outCount === 0) {
-                    const { $unknown } = record;
-                    if (Array.isArray($unknown)) {
-                        const [k, v] = $unknown;
-                        if (k === "__proto__") {
-                            writeKey(out);
-                        }
-                        out[k] = this._write(15, v);
-                    }
-                }
-                else if (typeof record.__type === "string") {
-                    for (const k in record) {
-                        const v = record[k];
-                        const targetKey = jsonName ? (nameMap[k] ?? k) : k;
-                        if (!(targetKey in out)) {
-                            out[targetKey] = this._write(15, v);
-                        }
-                    }
-                }
-                return out;
-            }
-            if (Array.isArray(value) && ns.isListSchema()) {
-                const listMember = ns.getValueSchema();
-                const out = [];
-                const sparse = !!ns.getMergedTraits().sparse;
-                for (const item of value) {
-                    if (sparse || item != null) {
-                        out.push(this._write(listMember, item));
-                    }
-                }
-                return out;
-            }
-            if (ns.isMapSchema()) {
-                const mapMember = ns.getValueSchema();
-                const out = {};
-                const sparse = !!ns.getMergedTraits().sparse;
-                for (const _k in value) {
-                    const _v = value[_k];
-                    if (sparse || _v != null) {
-                        if (_k === "__proto__") {
-                            writeKey(out);
-                        }
-                        out[_k] = this._write(mapMember, _v);
-                    }
-                }
-                return out;
-            }
-            if (value instanceof Uint8Array && ns.isBlobSchema()) {
-                if (ns === this.rootSchema) {
-                    return value;
-                }
-                return (this.serdeContext?.base64Encoder ?? toBase64)(value);
-            }
-            if (value instanceof Date && (ns.isTimestampSchema() || ns.isDocumentSchema())) {
-                const format = determineTimestampFormat(ns, this.settings);
-                switch (format) {
-                    case 5:
-                        return value.toISOString().replace(".000Z", "Z");
-                    case 6:
-                        return dateToUtcString(value);
-                    case 7:
-                        return value.getTime() / 1000;
-                    default:
-                        console.warn("Missing timestamp format, using epoch seconds", value);
-                        return value.getTime() / 1000;
-                }
-            }
-            if (value instanceof NumericValue) {
-                this.useReplacer = true;
-            }
-        }
-        if (value === null && container?.isStructSchema()) {
-            return void 0;
-        }
-        if (ns.isStringSchema()) {
-            if (typeof value === "undefined" && ns.isIdempotencyToken()) {
-                return generateIdempotencyToken();
-            }
-            const mediaType = ns.getMergedTraits().mediaType;
-            if (value != null && mediaType) {
-                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
-                if (isJson) {
-                    return LazyJsonString.from(value);
-                }
-            }
-            return value;
-        }
-        if (typeof value === "number") {
-            if (Math.abs(value) === Infinity || isNaN(value)) {
-                return String(value);
-            }
-            return value;
-        }
-        if (typeof value === "string" && ns.isBlobSchema()) {
-            if (ns === this.rootSchema) {
-                return value;
-            }
-            return (this.serdeContext?.base64Encoder ?? toBase64)(value);
-        }
-        if (typeof value === "bigint") {
-            this.useReplacer = true;
-        }
-        if (ns.isDocumentSchema()) {
-            if (isObject) {
-                if (value instanceof Uint8Array) {
-                    return (this.serdeContext?.base64Encoder ?? toBase64)(value);
-                }
-                const out = Array.isArray(value) ? [] : {};
-                for (const k in value) {
-                    const v = value[k];
-                    if (k === "__proto__") {
-                        writeKey(out);
-                    }
-                    if (v instanceof NumericValue) {
-                        this.useReplacer = true;
-                        out[k] = v;
-                    }
-                    else {
-                        out[k] = this._write(ns, v);
-                    }
-                }
-                return out;
-            }
-            else {
-                return structuredClone(value);
-            }
-        }
-        return value;
-    }
-}
-
-class JsonCodec extends SerdeContextConfig {
-    settings;
-    constructor(settings) {
-        super();
-        this.settings = settings;
-    }
-    createSerializer() {
-        const serializer = new JsonShapeSerializer(this.settings);
-        serializer.setSerdeContext(this.serdeContext);
-        return serializer;
-    }
-    createDeserializer() {
-        const deserializer = new JsonShapeDeserializer(this.settings);
-        deserializer.setSerdeContext(this.serdeContext);
-        return deserializer;
-    }
+function writeKey(obj) {
+    Object.defineProperty(obj, "__proto__", { value: undefined, writable: true, enumerable: true, configurable: true });
 }
 
 class XmlShapeDeserializer extends SerdeContextConfig {
@@ -11391,6 +9904,8 @@ class AwsEc2QueryProtocol extends AwsQueryProtocol {
         return false;
     }
 }
+
+const collectBodyString = (streamBody, context) => collectBody(streamBody, context).then((body) => (context?.utf8Encoder ?? toUtf8)(body));
 
 const parseXmlBody = (streamBody, context) => collectBodyString(streamBody, context).then((encoded) => {
     if (encoded.length) {
@@ -11908,12 +10423,6 @@ exports.AwsQueryProtocol = AwsQueryProtocol;
 exports.AwsRestJsonProtocol = AwsRestJsonProtocol;
 exports.AwsRestXmlProtocol = AwsRestXmlProtocol;
 exports.AwsSmithyRpcV2CborProtocol = AwsSmithyRpcV2CborProtocol;
-exports.JsonCodec = JsonCodec;
-exports.JsonCodec2 = JsonCodec2;
-exports.JsonShapeDeserializer = JsonShapeDeserializer;
-exports.JsonShapeDeserializer2 = JsonShapeDeserializer2;
-exports.JsonShapeSerializer = JsonShapeSerializer;
-exports.JsonShapeSerializer2 = JsonShapeSerializer2;
 exports.QueryShapeSerializer = QueryShapeSerializer;
 exports.XmlCodec = XmlCodec;
 exports.XmlShapeDeserializer = XmlShapeDeserializer;
@@ -11922,11 +10431,7 @@ exports._toBool = _toBool;
 exports._toNum = _toNum;
 exports._toStr = _toStr;
 exports.awsExpectUnion = awsExpectUnion;
-exports.loadJsonRpcErrorCode = loadJsonRpcErrorCode;
-exports.loadRestJsonErrorCode = loadRestJsonErrorCode;
 exports.loadRestXmlErrorCode = loadRestXmlErrorCode;
-exports.parseJsonBody = parseJsonBody;
-exports.parseJsonErrorBody = parseJsonErrorBody;
 exports.parseXmlBody = parseXmlBody;
 exports.parseXmlErrorBody = parseXmlErrorBody;
 
@@ -14961,7 +13466,7 @@ const commonParams = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-var version = "3.997.47";
+var version = "3.997.49";
 var packageInfo = {
 	version: version};
 
@@ -15563,7 +14068,7 @@ const commonParams = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-var version = "3.997.47";
+var version = "3.997.49";
 var packageInfo = {
 	version: version};
 
@@ -16256,7 +14761,7 @@ const commonParams = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-var version = "3.997.47";
+var version = "3.997.49";
 var packageInfo = {
 	version: version};
 
@@ -16916,7 +15421,7 @@ const commonParams = {
     UseDualStack: { type: "builtInParams", name: "useDualstackEndpoint" },
 };
 
-var version = "3.997.47";
+var version = "3.997.49";
 var packageInfo = {
 	version: version};
 
@@ -17778,6 +16283,7 @@ const writeSSOTokenToFile = (id, ssoToken) => {
 };
 
 const lastRefreshAttemptTimes = new Map();
+const inFlightRefreshes = new Map();
 const fromSso = (init = {}) => async ({ callerClientConfig } = {}) => {
     init.logger?.debug("@aws-sdk/token-providers - fromSso");
     const profiles = await parseKnownFiles(init);
@@ -17792,6 +16298,10 @@ const fromSso = (init = {}) => async ({ callerClientConfig } = {}) => {
         throw new TokenProviderError(`Profile '${profileName}' is missing required property 'sso_session'.`);
     }
     const ssoSessionName = profile["sso_session"];
+    const inFlightRefresh = inFlightRefreshes.get(ssoSessionName);
+    if (inFlightRefresh) {
+        return await inFlightRefresh;
+    }
     const ssoSessions = await loadSsoSessionData(init);
     const ssoSession = ssoSessions[ssoSessionName];
     if (!ssoSession) {
@@ -17821,6 +16331,10 @@ const fromSso = (init = {}) => async ({ callerClientConfig } = {}) => {
     if (existingToken.expiration.getTime() - Date.now() > EXPIRE_WINDOW_MS) {
         return existingToken;
     }
+    const inFlightRefreshAfterReadingToken = inFlightRefreshes.get(ssoSessionName);
+    if (inFlightRefreshAfterReadingToken) {
+        return await inFlightRefreshAfterReadingToken;
+    }
     const lastRefreshAttemptTime = lastRefreshAttemptTimes.get(ssoSessionName) ?? 0;
     if (Date.now() - lastRefreshAttemptTime < 30 * 1000) {
         validateTokenExpiry(existingToken);
@@ -17829,30 +16343,39 @@ const fromSso = (init = {}) => async ({ callerClientConfig } = {}) => {
     validateTokenKey("clientId", ssoToken.clientId, true);
     validateTokenKey("clientSecret", ssoToken.clientSecret, true);
     validateTokenKey("refreshToken", ssoToken.refreshToken, true);
-    try {
-        lastRefreshAttemptTimes.set(ssoSessionName, Date.now());
-        const newSsoOidcToken = await getNewSsoOidcToken(ssoToken, ssoRegion, init, callerClientConfig);
-        validateTokenKey("accessToken", newSsoOidcToken.accessToken);
-        validateTokenKey("expiresIn", newSsoOidcToken.expiresIn);
-        const newTokenExpiration = new Date(Date.now() + newSsoOidcToken.expiresIn * 1000);
+    const refresh = (async () => {
         try {
-            await writeSSOTokenToFile(ssoSessionName, {
-                ...ssoToken,
-                accessToken: newSsoOidcToken.accessToken,
-                expiresAt: newTokenExpiration.toISOString(),
-                refreshToken: newSsoOidcToken.refreshToken,
-            });
+            lastRefreshAttemptTimes.set(ssoSessionName, Date.now());
+            const newSsoOidcToken = await getNewSsoOidcToken(ssoToken, ssoRegion, init, callerClientConfig);
+            validateTokenKey("accessToken", newSsoOidcToken.accessToken);
+            validateTokenKey("expiresIn", newSsoOidcToken.expiresIn);
+            const newTokenExpiration = new Date(Date.now() + newSsoOidcToken.expiresIn * 1000);
+            try {
+                await writeSSOTokenToFile(ssoSessionName, {
+                    ...ssoToken,
+                    accessToken: newSsoOidcToken.accessToken,
+                    expiresAt: newTokenExpiration.toISOString(),
+                    refreshToken: newSsoOidcToken.refreshToken,
+                });
+            }
+            catch (error) {
+            }
+            return {
+                token: newSsoOidcToken.accessToken,
+                expiration: newTokenExpiration,
+            };
         }
         catch (error) {
+            validateTokenExpiry(existingToken);
+            return existingToken;
         }
-        return {
-            token: newSsoOidcToken.accessToken,
-            expiration: newTokenExpiration,
-        };
+    })();
+    inFlightRefreshes.set(ssoSessionName, refresh);
+    try {
+        return await refresh;
     }
-    catch (error) {
-        validateTokenExpiry(existingToken);
-        return existingToken;
+    finally {
+        inFlightRefreshes.delete(ssoSessionName);
     }
 };
 
@@ -22468,6 +20991,7 @@ function schemaLogFilter(schema, data) {
     return data;
 }
 
+const operationEventStreamMarker = Symbol.for("@smithy/op-event-stream");
 class Command {
     middlewareStack = constructStack();
     schema;
@@ -22501,9 +21025,21 @@ class Command {
             requestOptions = { ...requestOptions };
             delete requestOptions.metricsRecorder;
         }
-        if (smithyContext.eventStream) {
+        let isEventStream;
+        const schema = this.schema;
+        const marker = schema?.[operationEventStreamMarker];
+        if (marker !== undefined) {
+            isEventStream = marker;
+        }
+        else if (schema) {
+            if (Array.isArray(schema) && schema[0] === 9) {
+                const [, , , , input$, output$] = schema;
+                isEventStream = schema[operationEventStreamMarker] = Boolean(NormalizedSchema.of(input$).getEventStreamMember() || NormalizedSchema.of(output$).getEventStreamMember());
+            }
+        }
+        if (isEventStream) {
             requestOptions = {
-                isEventStream: true,
+                isEventStream,
                 ...requestOptions,
             };
         }
@@ -24830,6 +23366,9 @@ class HeaderMarshaller {
             if (!hasOwn(headers, headerName))
                 continue;
             const bytes = this.fromUtf8(headerName);
+            if (bytes.byteLength > 255) {
+                throw new Error(`@smithy/core/event-streams - header name exceeds 255 bytes: ${bytes.byteLength}`);
+            }
             chunks.push(Uint8Array.from([bytes.byteLength]), bytes, this.formatHeaderValue(headers[headerName]));
         }
         const out = new Uint8Array(chunks.reduce((carry, bytes) => carry + bytes.byteLength, 0));
@@ -24862,6 +23401,9 @@ class HeaderMarshaller {
                 longBytes.set(header.value.bytes, 1);
                 return longBytes;
             case "binary":
+                if (header.value.byteLength > MAX_HEADER_VALUE_BYTES) {
+                    throw new Error(`@smithy/core/event-streams - header value (binary) exceeds ${MAX_HEADER_VALUE_BYTES} bytes: ${header.value.byteLength}`);
+                }
                 const binView = new DataView(new ArrayBuffer(3 + header.value.byteLength));
                 binView.setUint8(0, 6);
                 binView.setUint16(1, header.value.byteLength, false);
@@ -24870,6 +23412,9 @@ class HeaderMarshaller {
                 return binBytes;
             case "string":
                 const utf8Bytes = this.fromUtf8(header.value);
+                if (utf8Bytes.byteLength > MAX_HEADER_VALUE_BYTES) {
+                    throw new Error(`@smithy/core/event-streams - header value (string) exceeds ${MAX_HEADER_VALUE_BYTES} bytes: ${utf8Bytes.byteLength}`);
+                }
                 const strView = new DataView(new ArrayBuffer(3 + utf8Bytes.byteLength));
                 strView.setUint8(0, 7);
                 strView.setUint16(1, utf8Bytes.byteLength, false);
@@ -25001,6 +23546,7 @@ const STRING_TAG = "string";
 const TIMESTAMP_TAG = "timestamp";
 const UUID_TAG = "uuid";
 const UUID_PATTERN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const MAX_HEADER_VALUE_BYTES = 32767;
 
 const PRELUDE_MEMBER_LENGTH = 4;
 const PRELUDE_LENGTH = PRELUDE_MEMBER_LENGTH * 2;
@@ -25698,15 +24244,15 @@ exports.universalEventStreamSerdeProvider = eventStreamSerdeProvider$1;
 /***/ 3422:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
-const { Uint8ArrayBlobAdapter, sdkStreamMixin, splitEvery, splitHeader, fromBase64, _parseEpochTimestamp, _parseRfc7231DateTime, _parseRfc3339DateTimeWithOffset, LazyJsonString, NumericValue, toUtf8, fromUtf8, generateIdempotencyToken, toBase64, dateToUtcString, quoteHeader } = __nccwpck_require__(2430);
-const { HttpRequest, HttpResponse, hasOwn, isValidHostname } = __nccwpck_require__(4534);
+const { Uint8ArrayBlobAdapter, sdkStreamMixin, splitEvery, splitHeader, fromBase64, _parseEpochTimestamp, _parseRfc7231DateTime, _parseRfc3339DateTimeWithOffset, LazyJsonString, NumericValue, toUtf8, fromUtf8, generateIdempotencyToken, toBase64, dateToUtcString, quoteHeader, parseEpochTimestamp, parseRfc7231DateTime, parseRfc3339DateTimeWithOffset } = __nccwpck_require__(2430);
+const { HttpRequest, HttpResponse, hasOwn, isValidHostname, getSmithyContext } = __nccwpck_require__(4534);
 const { parseQueryString, parseUrl } = __nccwpck_require__(4534);
 exports.HttpRequest = HttpRequest;
 exports.HttpResponse = HttpResponse;
 exports.isValidHostname = isValidHostname;
 exports.parseQueryString = parseQueryString;
 exports.parseUrl = parseUrl;
-const { TypeRegistry, NormalizedSchema, translateTraits } = __nccwpck_require__(6890);
+const { TypeRegistry, NormalizedSchema, translateTraits, deref } = __nccwpck_require__(6890);
 const { FieldPosition } = __nccwpck_require__(690);
 
 const collectBody = async (streamBody = new Uint8Array(), context) => {
@@ -26773,6 +25319,1686 @@ function buildQueryString(query) {
     return parts.join("&");
 }
 
+class SerdeContextConfig {
+    serdeContext;
+    setSerdeContext(serdeContext) {
+        this.serdeContext = serdeContext;
+    }
+}
+
+class UnionSerde {
+    from;
+    to;
+    keys;
+    constructor(from, to) {
+        this.from = from;
+        this.to = to;
+        const keys = Object.keys(this.from);
+        const set = new Set(keys);
+        set.delete("__type");
+        this.keys = set;
+    }
+    mark(key) {
+        this.keys.delete(key);
+    }
+    hasUnknown() {
+        return this.keys.size === 1 && Object.keys(this.to).length === 0;
+    }
+    writeUnknown() {
+        if (this.hasUnknown()) {
+            const k = this.keys.values().next().value;
+            const v = this.from[k];
+            this.to.$unknown = [k, v];
+        }
+    }
+}
+
+let canParseBuffer;
+function detectBufferParsing() {
+    if (canParseBuffer === undefined) {
+        try {
+            if (typeof Buffer !== "function") {
+                canParseBuffer = false;
+            }
+            else {
+                const result = JSON.parse(Buffer.from([0x7b, 0x7d]));
+                canParseBuffer = result !== null && typeof result === "object";
+            }
+        }
+        catch {
+            canParseBuffer = false;
+        }
+    }
+    return canParseBuffer;
+}
+
+function jsonReviver(key, value, context) {
+    if (context?.source) {
+        const numericString = context.source;
+        if (typeof value === "number") {
+            const inSafeRange = value <= Number.MAX_SAFE_INTEGER && value >= Number.MIN_SAFE_INTEGER;
+            if (inSafeRange) {
+                if (isRepresentable(numericString, value)) {
+                    return value;
+                }
+                return new NumericValue(numericString, "bigDecimal");
+            }
+            else {
+                if (isFractionalBigNumeric(numericString)) {
+                    return new NumericValue(numericString, "bigDecimal");
+                }
+                if (/[eE]/.test(numericString)) {
+                    return expandExponentToBigInt(numericString);
+                }
+                return BigInt(numericString);
+            }
+        }
+    }
+    return value;
+}
+function isFractionalBigNumeric(s) {
+    const dotIndex = s.indexOf(".");
+    if (dotIndex === -1) {
+        return false;
+    }
+    const eIndex = s.search(/[eE]/);
+    if (eIndex === -1) {
+        return true;
+    }
+    const fracDigits = eIndex - dotIndex - 1;
+    const exp = parseInt(s.slice(eIndex + 1), 10);
+    return exp < fracDigits;
+}
+function isRepresentable(numericString, value) {
+    if (numericString === String(value)) {
+        return true;
+    }
+    if (Object.is(value, -0)) {
+        return true;
+    }
+    if (/[eE]/.test(numericString)) {
+        return expandToDecimal(numericString) === expandToDecimal(String(value));
+    }
+    const normalized = numericString.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    const canonical = String(value);
+    if (normalized === canonical) {
+        return true;
+    }
+    if (/[eE]/.test(canonical)) {
+        return normalized === expandToDecimal(canonical);
+    }
+    return false;
+}
+function expandToDecimal(s) {
+    const negative = s.startsWith("-");
+    const abs = negative ? s.slice(1) : s;
+    const eIndex = abs.search(/[eE]/);
+    let result;
+    if (eIndex === -1) {
+        result = abs;
+    }
+    else {
+        const exp = parseInt(abs.slice(eIndex + 1), 10);
+        const mantissa = abs.slice(0, eIndex);
+        const dotIndex = mantissa.indexOf(".");
+        let digits;
+        let intLen;
+        if (dotIndex === -1) {
+            digits = mantissa;
+            intLen = mantissa.length;
+        }
+        else {
+            digits = mantissa.slice(0, dotIndex) + mantissa.slice(dotIndex + 1);
+            intLen = dotIndex;
+        }
+        digits = digits.replace(/0+$/, "") || "0";
+        const newDotPos = intLen + exp;
+        if (digits === "0") {
+            result = "0";
+        }
+        else if (newDotPos <= 0) {
+            result = "0." + "0".repeat(-newDotPos) + digits;
+        }
+        else if (newDotPos >= digits.length) {
+            result = digits + "0".repeat(newDotPos - digits.length);
+        }
+        else {
+            result = digits.slice(0, newDotPos) + "." + digits.slice(newDotPos);
+        }
+    }
+    if (result.includes(".")) {
+        result = result.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+    }
+    return (negative ? "-" : "") + result;
+}
+function expandExponentToBigInt(s) {
+    const eIndex = s.search(/[eE]/);
+    const exp = parseInt(s.slice(eIndex + 1), 10);
+    const negative = s.startsWith("-");
+    const mantissa = s.slice(negative ? 1 : 0, eIndex);
+    const dotIndex = mantissa.indexOf(".");
+    let digits;
+    let shift;
+    if (dotIndex === -1) {
+        digits = mantissa;
+        shift = exp;
+    }
+    else {
+        digits = mantissa.slice(0, dotIndex) + mantissa.slice(dotIndex + 1);
+        const fracDigits = mantissa.length - dotIndex - 1;
+        shift = exp - fracDigits;
+    }
+    digits = digits.replace(/0+$/, "") || "0";
+    const result = BigInt(digits) * 10n ** BigInt(shift + (mantissa.replace(".", "").length - digits.length));
+    return negative ? -result : result;
+}
+
+const REVIVER_SYMBOL = Symbol.for("@aws-sdk/reviver");
+function needsReviver(schema) {
+    const ns = NormalizedSchema.of(schema);
+    const raw = ns.getSchema();
+    if (Array.isArray(raw) && ns.isStructSchema()) {
+        if (REVIVER_SYMBOL in raw) {
+            return raw[REVIVER_SYMBOL];
+        }
+        const result = _check(ns, new Set());
+        raw[REVIVER_SYMBOL] = result;
+        return result;
+    }
+    return _check(ns, new Set());
+}
+function _check(ns, seen) {
+    const raw = ns.getSchema();
+    if (seen.has(raw)) {
+        return false;
+    }
+    seen.add(raw);
+    if (ns.isBigIntegerSchema() || ns.isBigDecimalSchema()) {
+        return true;
+    }
+    if (ns.isStructSchema()) {
+        for (const [, memberSchema] of ns.structIterator()) {
+            if (_check(memberSchema, seen)) {
+                return true;
+            }
+        }
+    }
+    else if (ns.isListSchema() || ns.isMapSchema()) {
+        if (_check(ns.getValueSchema(), seen)) {
+            return true;
+        }
+    }
+    else if (ns.isDocumentSchema()) {
+        return true;
+    }
+    return false;
+}
+
+const collectBodyString = (streamBody, context) => collectBody(streamBody, context).then((body) => (context?.utf8Encoder ?? toUtf8)(body));
+
+async function parseJsonBody(streamBody, context, schema) {
+    let parsingInput;
+    if (detectBufferParsing() && typeof streamBody?.[Symbol.asyncIterator] === "function") {
+        const buffer = await collectBody(streamBody, context);
+        if (typeof Buffer === "function") {
+            if (Buffer.isBuffer(buffer)) {
+                parsingInput = buffer;
+            }
+            else {
+                parsingInput = Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+            }
+        }
+    }
+    if (!parsingInput) {
+        parsingInput = await collectBodyString(streamBody, context);
+    }
+    if (parsingInput.length === 0) {
+        return {};
+    }
+    const reviver = schema && needsReviver(schema) ? jsonReviver : undefined;
+    try {
+        return JSON.parse(parsingInput, reviver);
+    }
+    catch (e) {
+        if (e?.name === "SyntaxError") {
+            Object.defineProperty(e, "$responseBodyText", {
+                value: typeof parsingInput === "string" ? parsingInput : parsingInput.toString("utf8"),
+            });
+        }
+        throw e;
+    }
+}
+const parseJsonErrorBody = async (errorBody, context) => {
+    const value = await parseJsonBody(errorBody, context);
+    value.message = value.message ?? value.Message;
+    return value;
+};
+const findKey = (object, key) => Object.keys(object).find((k) => k.toLowerCase() === key.toLowerCase());
+const sanitizeErrorCode = (rawValue) => {
+    let cleanValue = rawValue;
+    if (typeof cleanValue === "number") {
+        cleanValue = cleanValue.toString();
+    }
+    if (cleanValue.indexOf(",") >= 0) {
+        cleanValue = cleanValue.split(",")[0];
+    }
+    if (cleanValue.indexOf(":") >= 0) {
+        cleanValue = cleanValue.split(":")[0];
+    }
+    if (cleanValue.indexOf("#") >= 0) {
+        cleanValue = cleanValue.split("#")[1];
+    }
+    return cleanValue;
+};
+const loadRestJsonErrorCode = (output, data) => {
+    return loadErrorCode(output, data, ["header", "code", "type"]);
+};
+const loadJsonRpcErrorCode = (output, data, queryCompat = false) => {
+    return loadErrorCode(output, data, queryCompat ? ["code", "header", "type"] : ["type", "code", "header"]);
+};
+const loadSmithyRpcV2JsonErrorCode = (output, data) => {
+    if (data?.__type !== undefined) {
+        let cleanValue = data.__type;
+        if (typeof cleanValue === "number") {
+            cleanValue = cleanValue.toString();
+        }
+        if (cleanValue.indexOf(",") >= 0) {
+            cleanValue = cleanValue.split(",")[0];
+        }
+        if (cleanValue.indexOf(":") >= 0) {
+            cleanValue = cleanValue.split(":")[0];
+        }
+        return cleanValue;
+    }
+};
+const loadErrorCode = ({ headers }, data, order) => {
+    while (order.length > 0) {
+        const location = order.shift();
+        switch (location) {
+            case "header":
+                const headerKey = findKey(headers ?? {}, "x-amzn-errortype");
+                if (headerKey !== undefined) {
+                    return sanitizeErrorCode(headers[headerKey]);
+                }
+                break;
+            case "code":
+                const codeKey = findKey(data ?? {}, "code");
+                if (codeKey && data[codeKey] !== undefined) {
+                    return sanitizeErrorCode(data[codeKey]);
+                }
+                break;
+            case "type":
+                if (data?.__type !== undefined) {
+                    return sanitizeErrorCode(data.__type);
+                }
+                break;
+        }
+    }
+};
+
+function writeKey(obj) {
+    Object.defineProperty(obj, "__proto__", { value: undefined, writable: true, enumerable: true, configurable: true });
+}
+
+class JsonShapeDeserializer2 extends SerdeContextConfig {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    async read(schema, data) {
+        const reviver = needsReviver(schema) ? jsonReviver : undefined;
+        let parsed;
+        if (typeof data === "string") {
+            if (data.length === 0) {
+                return {};
+            }
+            parsed = JSON.parse(data, reviver);
+        }
+        else if (data instanceof Uint8Array && detectBufferParsing()) {
+            if (data.byteLength === 0) {
+                return {};
+            }
+            const buf = Buffer.isBuffer(data) ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+            parsed = JSON.parse(buf, reviver);
+        }
+        else {
+            parsed = await parseJsonBody(data, this.serdeContext, schema);
+        }
+        return this._read(schema, parsed);
+    }
+    readObject(schema, data) {
+        return this._read(schema, data);
+    }
+    _read(schema, value) {
+        const isObject = value !== null && typeof value === "object";
+        const ns = NormalizedSchema.of(schema);
+        if (isObject) {
+            if (ns.isStructSchema()) {
+                return this._readStruct(ns, value);
+            }
+            if (Array.isArray(value) && ns.isListSchema()) {
+                const listMember = ns.getValueSchema();
+                if (this.needsTransform(listMember)) {
+                    for (let i = 0; i < value.length; ++i) {
+                        value[i] = this._read(listMember, value[i]);
+                    }
+                }
+                return value;
+            }
+            if (ns.isMapSchema()) {
+                const mapMember = ns.getValueSchema();
+                const map = value;
+                if (this.needsTransform(mapMember)) {
+                    for (const k in map) {
+                        if (!hasOwn(map, k))
+                            continue;
+                        if (k === "__proto__") {
+                            writeKey(map);
+                        }
+                        map[k] = this._read(mapMember, map[k]);
+                    }
+                }
+                return map;
+            }
+        }
+        if (ns.isBlobSchema() && typeof value === "string") {
+            return fromBase64(value);
+        }
+        const mediaType = ns.getMergedTraits().mediaType;
+        if (ns.isStringSchema() && typeof value === "string" && mediaType) {
+            const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+            if (isJson) {
+                return LazyJsonString.from(value);
+            }
+            return value;
+        }
+        if (ns.isTimestampSchema() && value != null) {
+            const format = determineTimestampFormat(ns, this.settings);
+            switch (format) {
+                case 5:
+                    return parseRfc3339DateTimeWithOffset(value);
+                case 6:
+                    return parseRfc7231DateTime(value);
+                case 7:
+                    return parseEpochTimestamp(value);
+                default:
+                    console.warn("Missing timestamp format, parsing value with Date constructor:", value);
+                    return new Date(value);
+            }
+        }
+        if (ns.isBigIntegerSchema() && (typeof value === "number" || typeof value === "string")) {
+            return BigInt(value);
+        }
+        if (ns.isBigDecimalSchema() && value != undefined) {
+            if (value instanceof NumericValue) {
+                return value;
+            }
+            const untyped = value;
+            if (untyped.type === "bigDecimal" && "string" in untyped) {
+                return new NumericValue(untyped.string, untyped.type);
+            }
+            return new NumericValue(String(value), "bigDecimal");
+        }
+        if (ns.isNumericSchema() && typeof value === "string") {
+            switch (value) {
+                case "Infinity":
+                    return Infinity;
+                case "-Infinity":
+                    return -Infinity;
+                case "NaN":
+                    return NaN;
+            }
+            return value;
+        }
+        if (ns.isDocumentSchema()) {
+            if (isObject) {
+                if (Array.isArray(value)) {
+                    for (let i = 0; i < value.length; ++i) {
+                        const v = value[i];
+                        if (!(v instanceof NumericValue)) {
+                            value[i] = this._read(ns, v);
+                        }
+                    }
+                }
+                else {
+                    const doc = value;
+                    for (const k in doc) {
+                        if (!hasOwn(doc, k))
+                            continue;
+                        if (k === "__proto__") {
+                            writeKey(doc);
+                        }
+                        const v = doc[k];
+                        if (!(v instanceof NumericValue)) {
+                            doc[k] = this._read(ns, v);
+                        }
+                    }
+                }
+            }
+        }
+        return value;
+    }
+    _readStruct(ns, record) {
+        const union = ns.isUnionSchema();
+        const out = {};
+        let nameMap;
+        const hasType = typeof record.__type === "string";
+        const { jsonName } = this.settings;
+        if (jsonName && hasType) {
+            nameMap = {};
+        }
+        let unionSerde;
+        if (union) {
+            unionSerde = new UnionSerde(record, out);
+        }
+        for (const [memberName, memberSchema] of ns.structIterator()) {
+            let fromKey = memberName;
+            if (jsonName) {
+                fromKey = memberSchema.getMergedTraits().jsonName ?? fromKey;
+                if (hasType) {
+                    nameMap[fromKey] = memberName;
+                }
+            }
+            if (union) {
+                unionSerde.mark(fromKey);
+            }
+            if (record[fromKey] != null) {
+                out[memberName] = this._read(memberSchema, record[fromKey]);
+            }
+        }
+        if (union) {
+            unionSerde.writeUnknown();
+        }
+        else if (hasType) {
+            for (const k in record) {
+                if (!hasOwn(record, k))
+                    continue;
+                const v = record[k];
+                const t = jsonName ? (nameMap[k] ?? k) : k;
+                if (!(t in out)) {
+                    out[t] = v;
+                }
+            }
+        }
+        return out;
+    }
+    needsTransform(ns) {
+        if (ns.isBlobSchema() ||
+            ns.isTimestampSchema() ||
+            ns.isBigIntegerSchema() ||
+            ns.isBigDecimalSchema() ||
+            ns.isNumericSchema()) {
+            return true;
+        }
+        if (ns.isDocumentSchema() || ns.isStructSchema() || ns.isListSchema() || ns.isMapSchema()) {
+            return true;
+        }
+        if (ns.isStringSchema() && ns.getMergedTraits().mediaType) {
+            return true;
+        }
+        return false;
+    }
+}
+
+class JsonBytesStringAdapter extends Uint8Array {
+    string = null;
+    static allocUnsafe(bytes) {
+        if (typeof Buffer === "function") {
+            const buffer = Buffer.allocUnsafe(bytes);
+            return new JsonBytesStringAdapter(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+        }
+        return new JsonBytesStringAdapter(bytes);
+    }
+    toString() {
+        return this.s();
+    }
+    valueOf() {
+        return this.s();
+    }
+    includes(searchString, position) {
+        if (typeof searchString === "string") {
+            return this.s().includes(searchString, position);
+        }
+        return Uint8Array.prototype.includes.call(this, searchString, position);
+    }
+    indexOf(searchString, position) {
+        if (typeof searchString === "string") {
+            return this.s().indexOf(searchString, position);
+        }
+        return Uint8Array.prototype.indexOf.call(this, searchString, position);
+    }
+    lastIndexOf(searchString, position) {
+        if (typeof searchString === "string") {
+            return this.s().lastIndexOf(searchString, position);
+        }
+        const fn = Uint8Array.prototype.lastIndexOf;
+        if (position !== undefined) {
+            return fn.call(this, searchString, position);
+        }
+        return fn.call(this, searchString);
+    }
+    startsWith(searchString, position) {
+        return this.s().startsWith(searchString, position);
+    }
+    endsWith(searchString, endPosition) {
+        return this.s().endsWith(searchString, endPosition);
+    }
+    match(regexp) {
+        return this.s().match(regexp);
+    }
+    replace(searchValue, replaceValue) {
+        return this.s().replace(searchValue, replaceValue);
+    }
+    search(regexp) {
+        return this.s().search(regexp);
+    }
+    split(separator, limit) {
+        return this.s().split(separator, limit);
+    }
+    substring(start, end) {
+        return this.s().substring(start, end);
+    }
+    trim() {
+        return this.s().trim();
+    }
+    trimStart() {
+        return this.s().trimStart();
+    }
+    trimEnd() {
+        return this.s().trimEnd();
+    }
+    charAt(pos) {
+        return this.s().charAt(pos);
+    }
+    charCodeAt(index) {
+        return this.s().charCodeAt(index);
+    }
+    padStart(maxLength, fillString) {
+        return this.s().padStart(maxLength, fillString);
+    }
+    padEnd(maxLength, fillString) {
+        return this.s().padEnd(maxLength, fillString);
+    }
+    repeat(count) {
+        return this.s().repeat(count);
+    }
+    toUpperCase() {
+        return this.s().toUpperCase();
+    }
+    toLowerCase() {
+        return this.s().toLowerCase();
+    }
+    s() {
+        if (this.string == null) {
+            const n = Date.now();
+            if (n > warned + 60_000) {
+                console.warn("@aws-sdk/core/protocols - WARN - JsonCodec2: you have called a string method on a Uint8Array request body. " +
+                    "It has been automatically converted to string. In a future version this will throw an error.");
+                warned = n;
+            }
+            this.string = toUtf8(this);
+        }
+        return this.string;
+    }
+}
+var warned = 0;
+
+const encoder = new TextEncoder();
+const OPEN_BRACE = 0x7b;
+const CLOSE_BRACE = 0x7d;
+const OPEN_BRACKET = 0x5b;
+const CLOSE_BRACKET = 0x5d;
+const QUOTE = 0x22;
+const COLON = 0x3a;
+const COMMA = 0x2c;
+const BACKSLASH = 0x5c;
+const TRUE = new Uint8Array([0x74, 0x72, 0x75, 0x65]);
+const FALSE = new Uint8Array([0x66, 0x61, 0x6c, 0x73, 0x65]);
+const NULL = new Uint8Array([0x6e, 0x75, 0x6c, 0x6c]);
+const ESCAPE_TABLE = new Array(128).fill(null);
+ESCAPE_TABLE[0x08] = "b";
+ESCAPE_TABLE[0x09] = "t";
+ESCAPE_TABLE[0x0a] = "n";
+ESCAPE_TABLE[0x0c] = "f";
+ESCAPE_TABLE[0x0d] = "r";
+ESCAPE_TABLE[0x22] = '"';
+ESCAPE_TABLE[0x5c] = "\\";
+for (let i = 0; i < 0x20; i++) {
+    if (ESCAPE_TABLE[i] === null) {
+        ESCAPE_TABLE[i] = "u00" + i.toString(16).padStart(2, "0");
+    }
+}
+const INITIAL_BUFFER_SIZE = 2048;
+function alloc(size) {
+    return JsonBytesStringAdapter.allocUnsafe(size);
+}
+class JsonShapeSerializer2 extends SerdeContextConfig {
+    settings;
+    json;
+    i = 0;
+    rootSchema;
+    rawValue;
+    passthrough = false;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+        this.json = alloc(INITIAL_BUFFER_SIZE);
+    }
+    write(schema, value) {
+        this.i = 0;
+        this.rawValue = value;
+        this.rootSchema = NormalizedSchema.of(schema);
+        this.passthrough = this.rootSchema.isBlobSchema() || this.rootSchema.isStringSchema();
+        if (!this.passthrough) {
+            this.writeValue(this.rootSchema, value, undefined);
+        }
+    }
+    writeDiscriminatedDocument(schema, value) {
+        this.i = 0;
+        this.rootSchema = NormalizedSchema.of(schema);
+        const ns = this.rootSchema;
+        if (ns.isStructSchema() && value != null && typeof value === "object") {
+            this.writeValue(ns, value, undefined);
+            const prefix = `"__type":"${ns.getName(true) ?? "Unknown"}",`;
+            const z = prefix.length;
+            this.ensure(z);
+            this.json.copyWithin(1 + z, 1, this.i);
+            encoder.encodeInto(prefix, this.json.subarray(1));
+            this.i += z;
+        }
+        else {
+            this.writeValue(ns, value, undefined);
+        }
+    }
+    flush() {
+        this.rootSchema = undefined;
+        const finalPosition = this.i;
+        this.i = 0;
+        const raw = this.rawValue;
+        this.rawValue = undefined;
+        if (finalPosition === 0) {
+            return raw;
+        }
+        const result = this.json.subarray(0, finalPosition);
+        this.json = alloc(INITIAL_BUFFER_SIZE);
+        return result;
+    }
+    ensure(byteCount) {
+        const { i, json } = this;
+        if (i + byteCount > json.length) {
+            let newSize = json.length * 2;
+            while (newSize < i + byteCount) {
+                newSize *= 2;
+            }
+            const next = alloc(newSize);
+            next.set(this.json);
+            this.json = next;
+        }
+    }
+    writeAscii(s) {
+        const z = s.length;
+        this.ensure(z);
+        let { i, json } = this;
+        for (let j = 0; j < z; ++j) {
+            json[i] = s.charCodeAt(j);
+            i += 1;
+        }
+        this.i = i;
+    }
+    writeAsciiQuoted(s) {
+        const z = s.length;
+        this.ensure(z + 4);
+        let { json, i } = this;
+        json[i++] = QUOTE;
+        for (let j = 0; j < z; ++j) {
+            json[i++] = s.charCodeAt(j);
+        }
+        json[i++] = QUOTE;
+        this.i = i;
+    }
+    writeJsonString(s) {
+        const z = s.length;
+        this.ensure(z * 3 + 2);
+        this.json[this.i++] = QUOTE;
+        for (let j = 0; j < z; ++j) {
+            const c = s.charCodeAt(j);
+            if (c > 0x22 && c < 0x5c) {
+                this.json[this.i++] = c;
+            }
+            else if (c < 0x80) {
+                const esc = ESCAPE_TABLE[c];
+                if (esc !== null) {
+                    this.ensure(esc.length + 1 + (z - j - 1) * 3 + 1);
+                    this.json[this.i++] = BACKSLASH;
+                    for (let k = 0; k < esc.length; k++) {
+                        this.json[this.i++] = esc.charCodeAt(k);
+                    }
+                }
+                else {
+                    this.json[this.i++] = c;
+                }
+            }
+            else if (c >= 0xd800 && c <= 0xdbff) {
+                const next = j + 1 < z ? s.charCodeAt(j + 1) : 0;
+                if (next >= 0xdc00 && next <= 0xdfff) {
+                    this.ensure(4);
+                    const { written } = encoder.encodeInto(s.substring(j, j + 2), this.json.subarray(this.i));
+                    this.i += written;
+                    ++j;
+                }
+                else {
+                    this.ensure(6 + (z - j - 1) * 3 + 1);
+                    this.writeUnicodeEscape(c);
+                }
+            }
+            else if (c >= 0xdc00 && c <= 0xdfff) {
+                this.ensure(6 + (z - j - 1) * 3 + 1);
+                this.writeUnicodeEscape(c);
+            }
+            else {
+                let { i, json } = this;
+                if (c < 0x800) {
+                    json[i++] = 0xc0 | (c >> 6);
+                    json[i++] = 0x80 | (c & 0x3f);
+                }
+                else {
+                    json[i++] = 0xe0 | (c >> 12);
+                    json[i++] = 0x80 | ((c >> 6) & 0x3f);
+                    json[i++] = 0x80 | (c & 0x3f);
+                }
+                this.i = i;
+            }
+        }
+        this.json[this.i++] = QUOTE;
+    }
+    writeUnicodeEscape(code) {
+        let { json, i } = this;
+        json[i++] = BACKSLASH;
+        json[i++] = 0x75;
+        const hex = code.toString(16).padStart(4, "0");
+        for (let j = 0; j < 4; ++j) {
+            json[i++] = hex.charCodeAt(j);
+        }
+        this.i = i;
+    }
+    static B64 = (() => {
+        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const table = new Uint8Array(64);
+        for (let i = 0; i < 64; ++i) {
+            table[i] = chars.charCodeAt(i);
+        }
+        return table;
+    })();
+    writeBase64(data) {
+        const b64Len = Math.ceil(data.length / 3) * 4;
+        this.ensure(b64Len + 2);
+        const json = this.json;
+        const B64 = JsonShapeSerializer2.B64;
+        let i = this.i;
+        json[i++] = QUOTE;
+        const len = data.length;
+        const remainder = len % 3;
+        const mainLen = len - remainder;
+        for (let j = 0; j < mainLen; j += 3) {
+            const a = data[j];
+            const b = data[j + 1];
+            const c = data[j + 2];
+            json[i++] = B64[a >> 2];
+            json[i++] = B64[((a & 0x03) << 4) | (b >> 4)];
+            json[i++] = B64[((b & 0x0f) << 2) | (c >> 6)];
+            json[i++] = B64[c & 0x3f];
+        }
+        if (remainder === 2) {
+            const a = data[mainLen];
+            const b = data[mainLen + 1];
+            json[i++] = B64[a >> 2];
+            json[i++] = B64[((a & 0x03) << 4) | (b >> 4)];
+            json[i++] = B64[(b & 0x0f) << 2];
+            json[i++] = 0x3d;
+        }
+        else if (remainder === 1) {
+            const a = data[mainLen];
+            json[i++] = B64[a >> 2];
+            json[i++] = B64[(a & 0x03) << 4];
+            json[i++] = 0x3d;
+            json[i++] = 0x3d;
+        }
+        json[i++] = QUOTE;
+        this.i = i;
+    }
+    writeValue(schema, value, container) {
+        if (value == null) {
+            if (container?.isStructSchema()) {
+                if (value === undefined) {
+                    const ns = NormalizedSchema.of(schema);
+                    if (ns.isIdempotencyToken()) {
+                        this.writeAsciiQuoted(generateIdempotencyToken());
+                        return;
+                    }
+                }
+                return;
+            }
+            this.ensure(4);
+            this.json.set(NULL, this.i);
+            this.i += 4;
+            return;
+        }
+        const ns = NormalizedSchema.of(schema);
+        const isObject = typeof value === "object";
+        if (ns.isStringSchema()) {
+            const mediaType = ns.getMergedTraits().mediaType;
+            if (mediaType) {
+                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+                if (isJson) {
+                    this.writeJsonString(LazyJsonString.from(value).toString());
+                    return;
+                }
+            }
+        }
+        if (this.settings.bigNumberAsString && value != null && (ns.isBigIntegerSchema() || ns.isBigDecimalSchema())) {
+            const asString = value instanceof NumericValue ? value.string : String(value);
+            this.writeAsciiQuoted(asString);
+            return;
+        }
+        if (isObject) {
+            if (ns.isStructSchema()) {
+                this.writeStruct(ns, value);
+                return;
+            }
+            if (Array.isArray(value) && (ns.isListSchema() || ns.isDocumentSchema())) {
+                this.writeList(ns, value, ns.isDocumentSchema());
+                return;
+            }
+            if (ns.isMapSchema()) {
+                this.writeMap(ns, value, false);
+                return;
+            }
+            if (value instanceof Uint8Array && (ns.isBlobSchema() || ns.isDocumentSchema())) {
+                this.writeBase64(value);
+                return;
+            }
+            if (value instanceof Date && (ns.isTimestampSchema() || ns.isDocumentSchema())) {
+                this.writeTimestamp(ns, value);
+                return;
+            }
+            if (value instanceof NumericValue) {
+                this.writeAscii(value.string);
+                return;
+            }
+            if (ns.isDocumentSchema()) {
+                if (Array.isArray(value)) {
+                    this.writeList(ns, value, true);
+                }
+                else {
+                    this.writeMap(ns, value, true);
+                }
+                return;
+            }
+            const json = JSON.stringify(value);
+            this.writeAscii(json);
+            return;
+        }
+        if (typeof value === "string") {
+            if (ns.isBlobSchema()) {
+                const b64 = (this.serdeContext?.base64Encoder ?? toBase64)(value);
+                this.writeAsciiQuoted(b64);
+                return;
+            }
+            this.writeJsonString(value);
+            return;
+        }
+        if (typeof value === "number") {
+            if (Math.abs(value) === Infinity || Number.isNaN(value)) {
+                this.writeAsciiQuoted(String(value));
+                return;
+            }
+            const numStr = String(value);
+            this.writeAscii(numStr);
+            return;
+        }
+        if (typeof value === "boolean") {
+            this.ensure(5);
+            let { i, json } = this;
+            if (value) {
+                json.set(TRUE, i);
+                i += 4;
+            }
+            else {
+                json.set(FALSE, i);
+                i += 5;
+            }
+            this.i = i;
+            return;
+        }
+        if (typeof value === "bigint") {
+            this.writeAscii(value.toString());
+            return;
+        }
+        this.writeAscii(String(value));
+    }
+    writeStruct(ns, value) {
+        this.ensure(2);
+        this.json[this.i++] = OPEN_BRACE;
+        let wroteAny = false;
+        const hasType = typeof value.__type === "string";
+        let writtenKeys;
+        if (hasType) {
+            writtenKeys = new Set();
+        }
+        for (const [memberName, memberSchema] of ns.structIterator()) {
+            const item = value[memberName];
+            if (item == null && !memberSchema.isIdempotencyToken()) {
+                continue;
+            }
+            if (wroteAny) {
+                this.ensure(1);
+                this.json[this.i++] = COMMA;
+            }
+            wroteAny = true;
+            const targetKey = this.settings.jsonName ? (memberSchema.getMergedTraits().jsonName ?? memberName) : memberName;
+            if (writtenKeys) {
+                writtenKeys.add(memberName);
+                writtenKeys.add(targetKey);
+            }
+            this.writeAsciiQuoted(targetKey);
+            this.json[this.i++] = COLON;
+            this.writeValue(memberSchema, item, ns);
+        }
+        if (!wroteAny && ns.isUnionSchema()) {
+            const { $unknown } = value;
+            if (Array.isArray($unknown)) {
+                const [k, v] = $unknown;
+                this.writeAsciiQuoted(k);
+                this.ensure(1);
+                this.json[this.i++] = COLON;
+                this.writeValue(15, v, ns);
+            }
+        }
+        else if (hasType) {
+            for (const k in value) {
+                if (writtenKeys.has(k)) {
+                    continue;
+                }
+                writtenKeys.add(k);
+                const v = value[k];
+                if (wroteAny) {
+                    this.ensure(1);
+                    this.json[this.i++] = COMMA;
+                }
+                wroteAny = true;
+                this.writeAsciiQuoted(k);
+                this.ensure(1);
+                this.json[this.i++] = COLON;
+                this.writeValue(15, v, undefined);
+            }
+        }
+        this.ensure(1);
+        this.json[this.i++] = CLOSE_BRACE;
+    }
+    writeList(ns, value, isDocument) {
+        const sparse = !!ns.getMergedTraits().sparse;
+        const valueSchema = ns.getValueSchema();
+        if (!isDocument) {
+            if (valueSchema.isStringSchema() || valueSchema.isNumericSchema() || valueSchema.isBooleanSchema()) {
+                let hasSpecials = false;
+                for (let i = 0; i < value.length; ++i) {
+                    const v = value[i];
+                    if (Number.isNaN(v) || v === Infinity || v === -Infinity || (v == null && !sparse)) {
+                        hasSpecials = true;
+                        break;
+                    }
+                }
+                let json;
+                if (!hasSpecials) {
+                    json = JSON.stringify(value);
+                }
+                else {
+                    const out = [];
+                    for (let i = 0; i < value.length; ++i) {
+                        const v = value[i];
+                        if (v == null && !sparse)
+                            continue;
+                        if (Number.isNaN(v) || v === Infinity || v === -Infinity) {
+                            out.push(String(v));
+                        }
+                        else {
+                            out.push(v);
+                        }
+                    }
+                    json = JSON.stringify(out);
+                }
+                this.ensure(json.length * 3);
+                this.i += encoder.encodeInto(json, this.json.subarray(this.i)).written;
+                return;
+            }
+        }
+        this.ensure(2);
+        this.json[this.i++] = OPEN_BRACKET;
+        let wroteFirstItem = false;
+        for (let i = 0; i < value.length; ++i) {
+            const item = value[i];
+            if (isDocument ? item === undefined : item == null && !sparse) {
+                continue;
+            }
+            if (wroteFirstItem) {
+                this.ensure(1);
+                this.json[this.i++] = COMMA;
+            }
+            this.writeValue(valueSchema, item, undefined);
+            wroteFirstItem = true;
+        }
+        this.ensure(1);
+        this.json[this.i++] = CLOSE_BRACKET;
+    }
+    writeMap(ns, value, isDocument) {
+        const sparse = !!ns.getMergedTraits().sparse;
+        const valueSchema = ns.getValueSchema();
+        if (!isDocument) {
+            if (valueSchema.isStringSchema() || valueSchema.isNumericSchema() || valueSchema.isBooleanSchema()) {
+                let modifications;
+                for (const k in value) {
+                    if (!hasOwn(value, k))
+                        continue;
+                    const v = value[k];
+                    if (Number.isNaN(v) || v === Infinity || v === -Infinity) {
+                        (modifications ??= {})[k] = v;
+                        value[k] = String(v);
+                    }
+                    else if (v === null && !sparse) {
+                        (modifications ??= {})[k] = null;
+                        value[k] = undefined;
+                    }
+                }
+                const json = JSON.stringify(value);
+                if (modifications) {
+                    Object.assign(value, modifications);
+                }
+                this.ensure(json.length * 3);
+                this.i += encoder.encodeInto(json, this.json.subarray(this.i)).written;
+                return;
+            }
+        }
+        this.ensure(2);
+        this.json[this.i++] = OPEN_BRACE;
+        let first = true;
+        for (const k in value) {
+            if (!hasOwn(value, k))
+                continue;
+            const v = value[k];
+            if (isDocument ? v === undefined : v == null && !sparse) {
+                continue;
+            }
+            if (!first) {
+                this.ensure(1);
+                this.json[this.i++] = COMMA;
+            }
+            first = false;
+            this.writeJsonString(k);
+            this.ensure(1);
+            this.json[this.i++] = COLON;
+            this.writeValue(valueSchema, v, undefined);
+        }
+        this.ensure(1);
+        this.json[this.i++] = CLOSE_BRACE;
+    }
+    writeTimestamp(ns, value) {
+        const format = determineTimestampFormat(ns, this.settings);
+        switch (format) {
+            case 5: {
+                const iso = value.toISOString().replace(".000Z", "Z");
+                this.writeAsciiQuoted(iso);
+                return;
+            }
+            case 6: {
+                this.writeAsciiQuoted(dateToUtcString(value));
+                return;
+            }
+            case 7: {
+                const epochSecs = String(value.getTime() / 1000);
+                this.writeAscii(epochSecs);
+                return;
+            }
+            default: {
+                const epochSecs = String(value.getTime() / 1000);
+                this.writeAscii(epochSecs);
+                return;
+            }
+        }
+    }
+}
+
+class JsonCodec2 extends SerdeContextConfig {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    createSerializer() {
+        const serializer = new JsonShapeSerializer2(this.settings);
+        serializer.setSerdeContext(this.serdeContext);
+        return serializer;
+    }
+    createDeserializer() {
+        const deserializer = new JsonShapeDeserializer2(this.settings);
+        deserializer.setSerdeContext(this.serdeContext);
+        return deserializer;
+    }
+}
+
+class SmithyRpcV2JsonProtocol extends RpcProtocol {
+    codec = new JsonCodec2({
+        timestampFormat: {
+            useTrait: false,
+            default: 7,
+        },
+        jsonName: false,
+        bigNumberAsString: true,
+    });
+    serializer = this.codec.createSerializer();
+    deserializer = this.codec.createDeserializer();
+    constructor({ defaultNamespace, errorTypeRegistries, }) {
+        super({ defaultNamespace, errorTypeRegistries });
+    }
+    getShapeId() {
+        return "smithy.protocols#rpcv2Json";
+    }
+    getPayloadCodec() {
+        return this.codec;
+    }
+    async serializeRequest(operationSchema, input, context) {
+        const request = await super.serializeRequest(operationSchema, input, context);
+        Object.assign(request.headers, {
+            "content-type": this.getDefaultContentType(),
+            "smithy-protocol": "rpc-v2-json",
+            accept: this.getDefaultContentType(),
+        });
+        if (deref(operationSchema.input) === "unit") {
+            delete request.body;
+            delete request.headers["content-type"];
+        }
+        else if (!request.body) {
+            request.body = "{}";
+        }
+        const { service, operation } = getSmithyContext(context);
+        const path = `/service/${service}/operation/${operation}`;
+        if (request.path.endsWith("/")) {
+            request.path += path.slice(1);
+        }
+        else {
+            request.path += path;
+        }
+        return request;
+    }
+    async deserializeResponse(operationSchema, context, response) {
+        return super.deserializeResponse(operationSchema, context, response);
+    }
+    async handleError(operationSchema, context, response, dataObject, metadata) {
+        const errorName = loadSmithyRpcV2JsonErrorCode(response, dataObject) ?? "Unknown";
+        const errorMetadata = {
+            $metadata: metadata,
+            $fault: response.statusCode <= 500 ? "client" : "server",
+        };
+        let namespace = this.options.defaultNamespace;
+        if (errorName.includes("#")) {
+            [namespace] = errorName.split("#");
+        }
+        const registry = this.compositeErrorRegistry;
+        const nsRegistry = TypeRegistry.for(namespace);
+        registry.copyFrom(nsRegistry);
+        let errorSchema;
+        try {
+            errorSchema = registry.getSchema(errorName);
+        }
+        catch (ignored) {
+            if (dataObject.Message) {
+                dataObject.message = dataObject.Message;
+            }
+            const syntheticRegistry = TypeRegistry.for("smithy.ts.sdk.synthetic." + namespace);
+            registry.copyFrom(syntheticRegistry);
+            const baseExceptionSchema = registry.getBaseException();
+            if (baseExceptionSchema) {
+                const ErrorCtor = registry.getErrorCtor(baseExceptionSchema);
+                throw Object.assign(new ErrorCtor({ name: errorName }), errorMetadata, dataObject);
+            }
+            throw Object.assign(new Error(errorName), errorMetadata, dataObject);
+        }
+        const ns = NormalizedSchema.of(errorSchema);
+        const ErrorCtor = registry.getErrorCtor(errorSchema);
+        const message = dataObject.message ?? dataObject.Message ?? "Unknown";
+        const exception = new ErrorCtor({});
+        const output = {};
+        const errorDeserializer = this.codec.createDeserializer();
+        for (const [name, member] of ns.structIterator()) {
+            if (dataObject[name] != null) {
+                output[name] = errorDeserializer.readObject(member, dataObject[name]);
+            }
+        }
+        throw Object.assign(exception, errorMetadata, {
+            $fault: ns.getMergedTraits().error,
+            message,
+        }, output);
+    }
+    getDefaultContentType() {
+        return "application/json";
+    }
+}
+
+class JsonShapeDeserializer extends SerdeContextConfig {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    async read(schema, data) {
+        const reviver = needsReviver(schema) ? jsonReviver : undefined;
+        return this._read(schema, typeof data === "string" ? JSON.parse(data, reviver) : await parseJsonBody(data, this.serdeContext, schema));
+    }
+    readObject(schema, data) {
+        return this._read(schema, data);
+    }
+    _read(schema, value) {
+        const isObject = value !== null && typeof value === "object";
+        const ns = NormalizedSchema.of(schema);
+        if (isObject) {
+            if (ns.isStructSchema()) {
+                const record = value;
+                const union = ns.isUnionSchema();
+                const out = {};
+                let nameMap = void 0;
+                const { jsonName } = this.settings;
+                if (jsonName) {
+                    nameMap = {};
+                }
+                let unionSerde;
+                if (union) {
+                    unionSerde = new UnionSerde(record, out);
+                }
+                for (const [memberName, memberSchema] of ns.structIterator()) {
+                    let fromKey = memberName;
+                    if (jsonName) {
+                        fromKey = memberSchema.getMergedTraits().jsonName ?? fromKey;
+                        nameMap[fromKey] = memberName;
+                    }
+                    if (union) {
+                        unionSerde.mark(fromKey);
+                    }
+                    if (record[fromKey] != null) {
+                        out[memberName] = this._read(memberSchema, record[fromKey]);
+                    }
+                }
+                if (union) {
+                    unionSerde.writeUnknown();
+                }
+                else if (typeof record.__type === "string") {
+                    for (const k in record) {
+                        if (!hasOwn(record, k))
+                            continue;
+                        const v = record[k];
+                        const t = jsonName ? (nameMap[k] ?? k) : k;
+                        if (!(t in out)) {
+                            out[t] = v;
+                        }
+                    }
+                }
+                return out;
+            }
+            if (Array.isArray(value) && ns.isListSchema()) {
+                const listMember = ns.getValueSchema();
+                const out = [];
+                for (const item of value) {
+                    out.push(this._read(listMember, item));
+                }
+                return out;
+            }
+            if (ns.isMapSchema()) {
+                const mapMember = ns.getValueSchema();
+                const out = {};
+                for (const _k in value) {
+                    if (!hasOwn(value, _k))
+                        continue;
+                    if (_k === "__proto__") {
+                        writeKey(out);
+                    }
+                    out[_k] = this._read(mapMember, value[_k]);
+                }
+                return out;
+            }
+        }
+        if (ns.isBlobSchema() && typeof value === "string") {
+            return fromBase64(value);
+        }
+        const mediaType = ns.getMergedTraits().mediaType;
+        if (ns.isStringSchema() && typeof value === "string" && mediaType) {
+            const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+            if (isJson) {
+                return LazyJsonString.from(value);
+            }
+            return value;
+        }
+        if (ns.isTimestampSchema() && value != null) {
+            const format = determineTimestampFormat(ns, this.settings);
+            switch (format) {
+                case 5:
+                    return parseRfc3339DateTimeWithOffset(value);
+                case 6:
+                    return parseRfc7231DateTime(value);
+                case 7:
+                    return parseEpochTimestamp(value);
+                default:
+                    console.warn("Missing timestamp format, parsing value with Date constructor:", value);
+                    return new Date(value);
+            }
+        }
+        if (ns.isBigIntegerSchema() && (typeof value === "number" || typeof value === "string")) {
+            return BigInt(value);
+        }
+        if (ns.isBigDecimalSchema() && value != undefined) {
+            if (value instanceof NumericValue) {
+                return value;
+            }
+            const untyped = value;
+            if (untyped.type === "bigDecimal" && "string" in untyped) {
+                return new NumericValue(untyped.string, untyped.type);
+            }
+            return new NumericValue(String(value), "bigDecimal");
+        }
+        if (ns.isNumericSchema() && typeof value === "string") {
+            switch (value) {
+                case "Infinity":
+                    return Infinity;
+                case "-Infinity":
+                    return -Infinity;
+                case "NaN":
+                    return NaN;
+            }
+            return value;
+        }
+        if (ns.isDocumentSchema()) {
+            if (isObject) {
+                const out = Array.isArray(value) ? [] : {};
+                for (const k in value) {
+                    if (!hasOwn(value, k))
+                        continue;
+                    if (k === "__proto__") {
+                        writeKey(out);
+                    }
+                    const v = value[k];
+                    if (v instanceof NumericValue) {
+                        out[k] = v;
+                    }
+                    else {
+                        out[k] = this._read(ns, v);
+                    }
+                }
+                return out;
+            }
+            else {
+                return structuredClone(value);
+            }
+        }
+        return value;
+    }
+}
+
+const NUMERIC_CONTROL_CHAR = String.fromCharCode(925);
+class JsonReplacer {
+    values = new Map();
+    counter = 0;
+    stage = 0;
+    createReplacer() {
+        if (this.stage === 1) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer already created.");
+        }
+        if (this.stage === 2) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
+        }
+        this.stage = 1;
+        return (key, value) => {
+            if (value instanceof NumericValue) {
+                const v = `${NUMERIC_CONTROL_CHAR + "nv" + this.counter++}_` + value.string;
+                this.values.set(`"${v}"`, value.string);
+                return v;
+            }
+            if (typeof value === "bigint") {
+                const s = value.toString();
+                const v = `${NUMERIC_CONTROL_CHAR + "b" + this.counter++}_` + s;
+                this.values.set(`"${v}"`, s);
+                return v;
+            }
+            return value;
+        };
+    }
+    replaceInJson(json) {
+        if (this.stage === 0) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer not created yet.");
+        }
+        if (this.stage === 2) {
+            throw new Error("@aws-sdk/core/protocols - JsonReplacer exhausted.");
+        }
+        this.stage = 2;
+        if (this.counter === 0) {
+            return json;
+        }
+        for (const [key, value] of this.values) {
+            json = json.replace(key, value);
+        }
+        return json;
+    }
+}
+
+class JsonShapeSerializer extends SerdeContextConfig {
+    settings;
+    buffer;
+    useReplacer = false;
+    rootSchema;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    write(schema, value) {
+        this.rootSchema = NormalizedSchema.of(schema);
+        this.buffer = this._write(this.rootSchema, value);
+    }
+    flush() {
+        const { rootSchema, useReplacer } = this;
+        this.rootSchema = undefined;
+        this.useReplacer = false;
+        if (rootSchema?.isStructSchema() || rootSchema?.isDocumentSchema()) {
+            if (!useReplacer) {
+                return JSON.stringify(this.buffer);
+            }
+            const replacer = new JsonReplacer();
+            return replacer.replaceInJson(JSON.stringify(this.buffer, replacer.createReplacer(), 0));
+        }
+        return this.buffer;
+    }
+    writeDiscriminatedDocument(schema, value) {
+        this.write(schema, value);
+        if (typeof this.buffer === "object") {
+            this.buffer.__type = NormalizedSchema.of(schema).getName(true);
+        }
+    }
+    _write(schema, value, container) {
+        const isObject = value !== null && typeof value === "object";
+        const ns = NormalizedSchema.of(schema);
+        if (isObject) {
+            if (ns.isStructSchema()) {
+                const record = value;
+                const out = {};
+                const { jsonName } = this.settings;
+                let nameMap = void 0;
+                if (jsonName) {
+                    nameMap = {};
+                }
+                let outCount = 0;
+                for (const [memberName, memberSchema] of ns.structIterator()) {
+                    const serializableValue = this._write(memberSchema, record[memberName], ns);
+                    if (serializableValue !== undefined) {
+                        let targetKey = memberName;
+                        if (jsonName) {
+                            targetKey = memberSchema.getMergedTraits().jsonName ?? memberName;
+                            nameMap[memberName] = targetKey;
+                        }
+                        out[targetKey] = serializableValue;
+                        outCount++;
+                    }
+                }
+                if (ns.isUnionSchema() && outCount === 0) {
+                    const { $unknown } = record;
+                    if (Array.isArray($unknown)) {
+                        const [k, v] = $unknown;
+                        if (k === "__proto__") {
+                            writeKey(out);
+                        }
+                        out[k] = this._write(15, v);
+                    }
+                }
+                else if (typeof record.__type === "string") {
+                    for (const k in record) {
+                        if (!hasOwn(record, k))
+                            continue;
+                        const v = record[k];
+                        const targetKey = jsonName ? (nameMap[k] ?? k) : k;
+                        if (!(targetKey in out)) {
+                            out[targetKey] = this._write(15, v);
+                        }
+                    }
+                }
+                return out;
+            }
+            if (Array.isArray(value) && ns.isListSchema()) {
+                const listMember = ns.getValueSchema();
+                const out = [];
+                const sparse = !!ns.getMergedTraits().sparse;
+                for (const item of value) {
+                    if (sparse || item != null) {
+                        out.push(this._write(listMember, item));
+                    }
+                }
+                return out;
+            }
+            if (ns.isMapSchema()) {
+                const mapMember = ns.getValueSchema();
+                const out = {};
+                const sparse = !!ns.getMergedTraits().sparse;
+                for (const _k in value) {
+                    if (!hasOwn(value, _k))
+                        continue;
+                    const _v = value[_k];
+                    if (sparse || _v != null) {
+                        if (_k === "__proto__") {
+                            writeKey(out);
+                        }
+                        out[_k] = this._write(mapMember, _v);
+                    }
+                }
+                return out;
+            }
+            if (value instanceof Uint8Array && ns.isBlobSchema()) {
+                if (ns === this.rootSchema) {
+                    return value;
+                }
+                return (this.serdeContext?.base64Encoder ?? toBase64)(value);
+            }
+            if (value instanceof Date && (ns.isTimestampSchema() || ns.isDocumentSchema())) {
+                const format = determineTimestampFormat(ns, this.settings);
+                switch (format) {
+                    case 5:
+                        return value.toISOString().replace(".000Z", "Z");
+                    case 6:
+                        return dateToUtcString(value);
+                    case 7:
+                        return value.getTime() / 1000;
+                    default:
+                        console.warn("Missing timestamp format, using epoch seconds", value);
+                        return value.getTime() / 1000;
+                }
+            }
+            if (value instanceof NumericValue) {
+                this.useReplacer = true;
+            }
+        }
+        if (value === null && container?.isStructSchema()) {
+            return void 0;
+        }
+        if (ns.isStringSchema()) {
+            if (typeof value === "undefined" && ns.isIdempotencyToken()) {
+                return generateIdempotencyToken();
+            }
+            const mediaType = ns.getMergedTraits().mediaType;
+            if (value != null && mediaType) {
+                const isJson = mediaType === "application/json" || mediaType.endsWith("+json");
+                if (isJson) {
+                    return LazyJsonString.from(value);
+                }
+            }
+            return value;
+        }
+        if (typeof value === "number") {
+            if (Math.abs(value) === Infinity || isNaN(value)) {
+                return String(value);
+            }
+            return value;
+        }
+        if (typeof value === "string" && ns.isBlobSchema()) {
+            if (ns === this.rootSchema) {
+                return value;
+            }
+            return (this.serdeContext?.base64Encoder ?? toBase64)(value);
+        }
+        if (typeof value === "bigint") {
+            this.useReplacer = true;
+        }
+        if (ns.isDocumentSchema()) {
+            if (isObject) {
+                if (value instanceof Uint8Array) {
+                    return (this.serdeContext?.base64Encoder ?? toBase64)(value);
+                }
+                const out = Array.isArray(value) ? [] : {};
+                for (const k in value) {
+                    if (!hasOwn(value, k))
+                        continue;
+                    const v = value[k];
+                    if (k === "__proto__") {
+                        writeKey(out);
+                    }
+                    if (v instanceof NumericValue) {
+                        this.useReplacer = true;
+                        out[k] = v;
+                    }
+                    else {
+                        out[k] = this._write(ns, v);
+                    }
+                }
+                return out;
+            }
+            else {
+                return structuredClone(value);
+            }
+        }
+        return value;
+    }
+}
+
+class JsonCodec extends SerdeContextConfig {
+    settings;
+    constructor(settings) {
+        super();
+        this.settings = settings;
+    }
+    createSerializer() {
+        const serializer = new JsonShapeSerializer(this.settings);
+        serializer.setSerdeContext(this.serdeContext);
+        return serializer;
+    }
+    createDeserializer() {
+        const deserializer = new JsonShapeDeserializer(this.settings);
+        deserializer.setSerdeContext(this.serdeContext);
+        return deserializer;
+    }
+}
+
 exports.Field = Field;
 exports.Fields = Fields;
 exports.FromStringShapeDeserializer = FromStringShapeDeserializer;
@@ -26780,9 +27006,16 @@ exports.HttpBindingProtocol = HttpBindingProtocol;
 exports.HttpInterceptingShapeDeserializer = HttpInterceptingShapeDeserializer;
 exports.HttpInterceptingShapeSerializer = HttpInterceptingShapeSerializer;
 exports.HttpProtocol = HttpProtocol;
+exports.JsonCodec = JsonCodec;
+exports.JsonCodec2 = JsonCodec2;
+exports.JsonShapeDeserializer = JsonShapeDeserializer;
+exports.JsonShapeDeserializer2 = JsonShapeDeserializer2;
+exports.JsonShapeSerializer = JsonShapeSerializer;
+exports.JsonShapeSerializer2 = JsonShapeSerializer2;
 exports.RequestBuilder = RequestBuilder;
 exports.RpcProtocol = RpcProtocol;
 exports.SerdeContext = SerdeContext;
+exports.SmithyRpcV2JsonProtocol = SmithyRpcV2JsonProtocol;
 exports.ToStringShapeSerializer = ToStringShapeSerializer;
 exports.buildQueryString = buildQueryString;
 exports.collectBody = collectBody;
@@ -26794,6 +27027,11 @@ exports.escapeUriPath = escapeUriPath;
 exports.extendedEncodeURIComponent = extendedEncodeURIComponent;
 exports.getContentLengthPlugin = getContentLengthPlugin;
 exports.getHttpHandlerExtensionConfiguration = getHttpHandlerExtensionConfiguration;
+exports.loadJsonRpcErrorCode = loadJsonRpcErrorCode;
+exports.loadRestJsonErrorCode = loadRestJsonErrorCode;
+exports.loadSmithyRpcV2JsonErrorCode = loadSmithyRpcV2JsonErrorCode;
+exports.parseJsonBody = parseJsonBody;
+exports.parseJsonErrorBody = parseJsonErrorBody;
 exports.requestBuilder = requestBuilder;
 exports.resolveHttpHandlerRuntimeConfig = resolveHttpHandlerRuntimeConfig;
 exports.resolvedPath = resolvedPath;
@@ -70952,7 +71190,7 @@ function defaultFactory (origin, opts) {
 }
 
 class Agent extends DispatcherBase {
-  constructor ({ factory = defaultFactory, maxRedirections = 0, connect, ...options } = {}) {
+  constructor ({ factory = defaultFactory, maxRedirections = 0, connect, tls, ...options } = {}) {
     if (typeof factory !== 'function') {
       throw new InvalidArgumentError('factory must be a function.')
     }
@@ -70971,11 +71209,15 @@ class Agent extends DispatcherBase {
       connect = { ...connect }
     }
 
+    if (tls && typeof tls !== 'function') {
+      tls = { ...tls }
+    }
+
     this[kInterceptors] = options.interceptors?.Agent && Array.isArray(options.interceptors.Agent)
       ? options.interceptors.Agent
       : [createRedirectInterceptor({ maxRedirections })]
 
-    this[kOptions] = { ...util.deepClone(options), connect }
+    this[kOptions] = { ...util.deepClone(options), connect, tls }
     this[kOptions].interceptors = options.interceptors
       ? { ...options.interceptors }
       : undefined
@@ -72008,8 +72250,6 @@ async function connectH1 (client, socket) {
   socket[kParser] = new Parser(client, socket, llhttpInstance)
 
   addListener(socket, 'error', function (err) {
-    assert(err.code !== 'ERR_TLS_CERT_ALTNAME_INVALID')
-
     const parser = this[kParser]
 
     // On Mac OS, we get an ECONNRESET even if there is a full body to be forwarded
@@ -72939,8 +73179,6 @@ async function connectH2 (client, socket) {
   socket[kHTTP2Session] = session
 
   util.addListener(socket, 'error', function (err) {
-    assert(err.code !== 'ERR_TLS_CERT_ALTNAME_INVALID')
-
     this[kError] = err
 
     this[kClient][kOnError](err)
@@ -73014,8 +73252,6 @@ function resumeH2 (client) {
 }
 
 function onHttp2SessionError (err) {
-  assert(err.code !== 'ERR_TLS_CERT_ALTNAME_INVALID')
-
   this[kSocket][kError] = err
   this[kClient][kOnError](err)
 }
@@ -73713,9 +73949,10 @@ class Client extends DispatcherBase {
     // h2
     maxConcurrentStreams,
     allowH2,
-    webSocket
+    webSocket,
+    eventSource
   } = {}) {
-    super({ webSocket })
+    super({ webSocket, eventSource })
 
     if (keepAlive !== undefined) {
       throw new InvalidArgumentError('unsupported keepAlive, use pipelining=0 instead')
@@ -74236,6 +74473,7 @@ module.exports = Client
 
 
 
+const buffer = __nccwpck_require__(4573)
 const Dispatcher = __nccwpck_require__(883)
 const {
   ClientDestroyedError,
@@ -74248,6 +74486,7 @@ const kOnDestroyed = Symbol('onDestroyed')
 const kOnClosed = Symbol('onClosed')
 const kInterceptedDispatch = Symbol('Intercepted Dispatch')
 const kWebSocketOptions = Symbol('webSocketOptions')
+const kEventSourceOptions = Symbol('eventSourceOptions')
 
 class DispatcherBase extends Dispatcher {
   constructor (opts) {
@@ -74258,12 +74497,19 @@ class DispatcherBase extends Dispatcher {
     this[kClosed] = false
     this[kOnClosed] = []
     this[kWebSocketOptions] = opts?.webSocket ?? {}
+    this[kEventSourceOptions] = opts?.eventSource ?? {}
   }
 
   get webSocketOptions () {
     return {
       maxFragments: this[kWebSocketOptions].maxFragments ?? 131072,
       maxPayloadSize: this[kWebSocketOptions].maxPayloadSize ?? 128 * 1024 * 1024
+    }
+  }
+
+  get eventSourceOptions () {
+    return {
+      maxEventSize: this[kEventSourceOptions].maxEventSize ?? buffer.kStringMaxLength
     }
   }
 
@@ -80625,6 +80871,7 @@ module.exports = {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 
+const buffer = __nccwpck_require__(4573)
 const { Transform } = __nccwpck_require__(7075)
 const { isASCIINumber, isValidLastEventId } = __nccwpck_require__(4811)
 
@@ -80649,10 +80896,18 @@ const COLON = 0x3A
  */
 const SPACE = 0x20
 
+const defaultMaxEventSize = buffer.kStringMaxLength
+
 const DATA = Buffer.from('data')
 const EVENT = Buffer.from('event')
 const ID = Buffer.from('id')
 const RETRY = Buffer.from('retry')
+
+// Each data field creates a string node, and each unconsumed input chunk keeps
+// a Buffer wrapper. The absolute ceiling protects the large default byte limit.
+const minParserItems = 1024
+const maxParserItems = 131072
+const bytesPerParserItem = 128
 
 function isASCIINumberBytes (buffer, start) {
   if (start >= buffer.length) {
@@ -80690,6 +80945,12 @@ function isFieldName (line, length, field) {
   }
 
   return true
+}
+
+function createMaxEventSizeExceededError () {
+  const error = new Error('EventSource message size exceeded')
+  error.aborted = false
+  return error
 }
 
 /**
@@ -80740,6 +81001,13 @@ class EventSourceStream extends Transform {
   pos = 0
   lineChunkIndex = 0
   linePos = 0
+  lineLength = 0
+  eventSize = 0
+  eventFieldSizes = { data: 0, event: 0, id: 0, retry: 0 }
+  dataLineCount = 0
+  maxEventSize
+  maxDataLines
+  maxBufferedChunks
 
   event = {
     data: undefined,
@@ -80750,6 +81018,7 @@ class EventSourceStream extends Transform {
 
   /**
    * @param {object} options
+   * @param {number} [options.maxEventSize]
    * @param {eventSourceSettings} options.eventSourceSettings
    * @param {Function} [options.push]
    */
@@ -80761,6 +81030,12 @@ class EventSourceStream extends Transform {
     super(options)
 
     this.state = options.eventSourceSettings || {}
+    this.maxEventSize = options.maxEventSize ?? defaultMaxEventSize
+    const parserItemLimit = this.maxEventSize > 0
+      ? Math.min(maxParserItems, Math.max(minParserItems, Math.floor(this.maxEventSize / bytesPerParserItem)))
+      : 0
+    this.maxDataLines = parserItemLimit
+    this.maxBufferedChunks = parserItemLimit
     if (options.push) {
       this.push = options.push
     }
@@ -80778,6 +81053,14 @@ class EventSourceStream extends Transform {
       return
     }
 
+    // A leading line ending can immediately release the currently buffered
+    // line, even when it uses the final allowed chunk slot.
+    if (this.maxEventSize > 0 &&
+        this.chunks.length >= this.maxBufferedChunks &&
+        chunk[0] !== LF && chunk[0] !== CR) {
+      callback(createMaxEventSizeExceededError())
+      return
+    }
     this.chunks.push(chunk)
 
     // Strip leading byte-order-mark if we opened the stream and started
@@ -80856,7 +81139,12 @@ class EventSourceStream extends Transform {
 
         // In any case, we can process the line as we reached an
         // end-of-line character
-        this.parseLine(this.readLine(), this.event)
+        try {
+          this.parseLine(this.readLine(), this.event)
+        } catch (error) {
+          callback(error)
+          return
+        }
         this.consumeCurrentByte()
         // A line was processed and this could be the end of the event. We need
         // to check if the next line is empty to determine if the event is
@@ -80865,15 +81153,28 @@ class EventSourceStream extends Transform {
         continue
       }
 
+      // readLine() is only called after CR or LF. Reject an unfinished line
+      // before it can retain an unbounded number of decoded chunks. The seven
+      // extra bytes allow the longest field prefix ("event: " or "retry: ").
+      if (this.maxEventSize > 0 && ++this.lineLength > this.maxEventSize + 7) {
+        callback(createMaxEventSizeExceededError())
+        return
+      }
       this.advanceCursor()
     }
 
     callback()
   }
 
+  _destroy (error, callback) {
+    this.chunks.length = 0
+    this.clearEvent()
+    super._destroy(error, callback)
+  }
+
   /**
    * @param {Buffer} line
-   * @param {EventStreamEvent} event
+   * @param {EventSourceStreamEvent} event
    */
   parseLine (line, event) {
     // If the line is empty (a blank line)
@@ -80907,6 +81208,13 @@ class EventSourceStream extends Transform {
     }
 
     if (isFieldName(line, fieldLength, DATA)) {
+      if (this.maxEventSize > 0 && this.dataLineCount >= this.maxDataLines) {
+        throw createMaxEventSizeExceededError()
+      }
+      const valueBytes = line.length - valueStart
+      const dataSize = this.eventFieldSizes.data + (event.data === undefined ? 0 : 1) + valueBytes
+      this.setEventFieldSize('data', dataSize)
+
       const value = line.toString('utf8', valueStart)
 
       if (event.data === undefined) {
@@ -80914,11 +81222,13 @@ class EventSourceStream extends Transform {
       } else {
         event.data += `\n${value}`
       }
+      this.dataLineCount++
       return
     }
 
     if (isFieldName(line, fieldLength, RETRY)) {
       if (isASCIINumberBytes(line, valueStart)) {
+        this.setEventFieldSize('retry', line.length - valueStart)
         event.retry = line.toString('utf8', valueStart)
       }
       return
@@ -80926,18 +81236,27 @@ class EventSourceStream extends Transform {
 
     if (isFieldName(line, fieldLength, ID)) {
       if (isValidLastEventIdBytes(line, valueStart)) {
+        this.setEventFieldSize('id', line.length - valueStart)
         event.id = line.toString('utf8', valueStart)
       }
       return
     }
 
     if (isFieldName(line, fieldLength, EVENT)) {
-      const value = line.toString('utf8', valueStart)
-
-      if (value.length > 0) {
-        event.event = value
+      if (valueStart < line.length) {
+        this.setEventFieldSize('event', line.length - valueStart)
+        event.event = line.toString('utf8', valueStart)
       }
     }
+  }
+
+  setEventFieldSize (field, size) {
+    const eventSize = this.eventSize - this.eventFieldSizes[field] + size
+    if (this.maxEventSize > 0 && eventSize > this.maxEventSize) {
+      throw createMaxEventSizeExceededError()
+    }
+    this.eventSize = eventSize
+    this.eventFieldSizes[field] = size
   }
 
   /**
@@ -80970,6 +81289,12 @@ class EventSourceStream extends Transform {
     this.event.event = undefined
     this.event.id = undefined
     this.event.retry = undefined
+    this.eventSize = 0
+    this.dataLineCount = 0
+    this.eventFieldSizes.data = 0
+    this.eventFieldSizes.event = 0
+    this.eventFieldSizes.id = 0
+    this.eventFieldSizes.retry = 0
   }
 
   hasPendingEvent () {
@@ -81005,14 +81330,16 @@ class EventSourceStream extends Transform {
   syncLineStartToCursor () {
     this.lineChunkIndex = this.chunkIndex
     this.linePos = this.pos
+    this.lineLength = 0
     this.dropConsumedChunks()
   }
 
   dropConsumedChunks () {
-    while (this.lineChunkIndex > 0) {
-      this.chunks.shift()
-      this.lineChunkIndex--
-      this.chunkIndex--
+    if (this.lineChunkIndex > 0) {
+      const consumed = this.lineChunkIndex
+      this.chunks.splice(0, consumed)
+      this.lineChunkIndex = 0
+      this.chunkIndex -= consumed
     }
 
     if (this.chunkIndex === this.chunks.length) {
@@ -81137,6 +81464,7 @@ const { isNetworkError } = __nccwpck_require__(9051)
 const { delay } = __nccwpck_require__(4811)
 const { kEnumerableProperty } = __nccwpck_require__(3440)
 const { environmentSettingsObject } = __nccwpck_require__(3168)
+const { getGlobalDispatcher } = __nccwpck_require__(2581)
 
 let experimentalWarned = false
 
@@ -81418,6 +81746,7 @@ class EventSource extends EventTarget {
 
       const eventSourceStream = new EventSourceStream({
         eventSourceSettings: this.#state,
+        maxEventSize: this.#dispatcher.eventSourceOptions?.maxEventSize,
         push: (event) => {
           this.dispatchEvent(createFastMessageEvent(
             event.type,
@@ -81596,7 +81925,8 @@ webidl.converters.EventSourceInitDict = webidl.dictionaryConverter([
   },
   {
     key: 'dispatcher', // undici only
-    converter: webidl.converters.any
+    converter: webidl.converters.any,
+    defaultValue: () => getGlobalDispatcher()
   }
 ])
 
@@ -86692,8 +87022,10 @@ async function httpNetworkFetch (
   // 19. Run these steps in parallel:
 
   //    1. Run these steps, but abort when fetchParams is canceled:
-  fetchParams.controller.onAborted = onAborted
-  fetchParams.controller.on('terminated', onAborted)
+  if (!fetchParams.controller.resume) {
+    fetchParams.controller.on('terminated', onAborted)
+  }
+
   fetchParams.controller.resume = async () => {
     // 1. While true
     while (true) {
@@ -86862,8 +87194,6 @@ async function httpNetworkFetch (
           }
           location = headersList.get('location', true)
 
-          this.body = new Readable({ read: resume })
-
           const decoders = []
 
           const willFollow = location && request.redirect === 'follow' &&
@@ -86881,7 +87211,7 @@ async function httpNetworkFetch (
             // CVE fix similar to urllib3 (GHSA-gm62-xv2j-4w53) and curl (CVE-2022-32206).
             const maxContentEncodings = 5
             if (codings.length > maxContentEncodings) {
-              reject(new Error(`too many content-encodings in response: ${codings.length}, maximum allowed is ${maxContentEncodings}`))
+              this.abort(new Error(`too many content-encodings in response: ${codings.length}, maximum allowed is ${maxContentEncodings}`))
               return true
             }
 
@@ -86913,6 +87243,8 @@ async function httpNetworkFetch (
               }
             }
           }
+
+          this.body = new Readable({ read: resume })
 
           const onError = this.onError.bind(this)
 
@@ -86958,10 +87290,6 @@ async function httpNetworkFetch (
         onComplete () {
           if (this.abort) {
             fetchParams.controller.off('terminated', this.abort)
-          }
-
-          if (fetchParams.controller.onAborted) {
-            fetchParams.controller.off('terminated', fetchParams.controller.onAborted)
           }
 
           fetchParams.controller.ended = true
@@ -93438,6 +93766,20 @@ class ByteParser extends Writable {
         if (isControlFrame(this.#info.opcode)) {
           this.#loop = this.parseControlFrame(body)
           this.#state = parserStates.INFO
+
+          // If the automatic PONG/CLOSE reply filled the socket's write buffer,
+          // stop parsing and resume on drain so a PING flood cannot grow the
+          // outbound queue without bound.
+          const socket = this.ws[kResponse].socket
+          if (this.#loop && socket.writableNeedDrain) {
+            this.#loop = false
+            socket.once('drain', () => {
+              if (this.destroyed) return
+              this.#loop = true
+              this.run(callback)
+            })
+            return
+          }
         } else {
           if (!this.#info.compressed) {
             if (!this.writeFragments(body)) {

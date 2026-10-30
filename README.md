@@ -53,7 +53,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Upload ZIP to S3
-        uses: NotCoffee418/s3-zip-upload@v1.8
+        uses: NotCoffee418/s3-zip-upload@v1.9
         env:
           AWS_SECRET_ID: ${{ secrets.AWS_SECRET_ID }}
           AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
@@ -71,7 +71,7 @@ jobs:
 
 - Pass `AWS_SECRET_ID` and `AWS_SECRET_KEY` from GitHub secrets. Use an IAM user that can only `s3:PutObject` to the one bucket or prefix it needs.
 - Pin the action to a full commit SHA rather than a tag, and keep it current with Dependabot:
-  `uses: NotCoffee418/s3-zip-upload@<full-commit-sha> # v1.8`
+  `uses: NotCoffee418/s3-zip-upload@<full-commit-sha> # v1.9`
 - `SOURCE_PATH` is zipped as-is. Don't point it at the repository root, or `.git`, `.env` and anything else in the checkout gets uploaded.
 - `.env` files are **not** read by the action (only by `npm run debug`), so a checked-out repository can't change its configuration.
 - The access key ID, secret key and session token are always masked in the log, and scrubbed from the action's own error output. Errors print only their message, never a stack trace.
@@ -98,5 +98,6 @@ npm run debug zip # uploads a dummy folder as debug-override/debug-action.zip
 ## Releasing new version
 
 1. Update the version in `package.json`
-2. `npm run build` and commit `release/`
-3. Create a new tag and release on GitHub
+2. `npm run install` the current version of dependencies
+3. `npm run build` and commit `release/`
+4. Create a new tag and release on GitHub
